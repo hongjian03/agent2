@@ -7,6 +7,34 @@ from langchain.callbacks import StreamlitCallbackHandler
 from langchain.chains import SequentialChain, LLMChain
 import os
 from typing import Dict, Any, List
+import logging
+import sys
+# 配置日志记录
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+
+logger = logging.getLogger(__name__)
+
+# 记录程序启动
+logger.info("程序开始运行")
+
+# 只在第一次运行时替换 sqlite3
+if 'sqlite_setup_done' not in st.session_state:
+    try:
+        logger.info("尝试设置 SQLite")
+        __import__('pysqlite3')
+        sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+        st.session_state.sqlite_setup_done = True
+        logger.info("SQLite 设置成功")
+    except Exception as e:
+        logger.error(f"SQLite 设置错误: {str(e)}")
+        st.session_state.sqlite_setup_done = True
+
 
 class PromptTemplates:
     def __init__(self):
