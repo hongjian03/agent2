@@ -1,6 +1,6 @@
 import streamlit as st
 import json
-from langchain.chat_models import ChatOpenAI
+from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
 from langchain.callbacks import StreamlitCallbackHandler
