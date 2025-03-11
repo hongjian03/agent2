@@ -314,6 +314,7 @@ def main():
         st.session_state.prompt_templates = PromptTemplates()
     
     tab1, tab2 = st.tabs(["咨询沟通分析助理", "提示词设置"])
+    st.markdown(f"<div class='model-info'>🤖 当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     with tab1:
         st.title("咨询沟通分析助理")
