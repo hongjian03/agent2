@@ -7,3 +7,5 @@ xlsxwriter
 langchain-openai
 pysqlite3-binary
 chromadb
+langchain-community
+langchain-core
