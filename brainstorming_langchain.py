@@ -9,6 +9,8 @@ import os
 from typing import Dict, Any, List
 import logging
 import sys
+from docx import Document
+import io
 # 配置日志记录
 logging.basicConfig(
     level=logging.INFO,
@@ -41,16 +43,33 @@ class PromptTemplates:
         # 初始化默认模板
         self.default_templates = {
             'consultant_role': """
-            你是一位资深咨询顾问，擅长分析各类文档和材料，提供专业的见解和建议。
-            你的主要职责是仔细阅读提供的文档，提取关键信息，分析问题，并提供具体的解决方案和建议。
+            你是一位资深的咨询顾问培训师，擅长分析咨询顾问与客户的沟通过程，提供专业的沟通技巧改进建议。
+            你需要基于沟通目的，分析沟通过程中的优缺点，并提供具体的改进建议。
             """,
             
             'consultant_task': """
-            请分析以下文档内容：
-            1. 提取文档中的关键信息和重点
-            2. 分析存在的主要问题和挑战
-            3. 提供具体的解决方案和建议
-            4. 给出可行的执行步骤和建议
+            基于提供的沟通目的：{communication_purpose}
+            沟通记录：{document_content}
+            
+            请分析这份咨询顾问与学生的沟通记录，完成以下分析：
+            
+            1. 沟通要点分析：
+            - 根据沟通目的，列出本次沟通应该关注的关键要点
+            - 评估这些要点在实际沟通中是否得到了充分的覆盖
+            
+            2. 沟通过程细项分析：
+            - 开场与关系建立
+            - 信息获取的完整性
+            - 问题解答的专业性
+            - 情绪管理与共情能力
+            - 总体节奏把控
+            
+            3. 改进建议：
+            - 沟通文稿的具体优化建议
+            - 给咨询顾问的具体提升建议
+            - 下次沟通的重点关注事项
+            
+            请分点陈述，给出具体的例子和建议。
             """
         }
         
@@ -80,10 +99,10 @@ class BrainstormingAgent:
 
     def setup_chain(self):
         # 创建咨询分析链
-        consultant_prompt = ChatPromptTemplate.from_messages([
-            SystemMessage(content=self.prompt_templates.get_template('consultant_role')),
-            HumanMessage(content="{task}\n\n{document_content}")
-        ])
+        consultant_prompt = ChatPromptTemplate.from_template(
+            system=self.prompt_templates.get_template('consultant_role'),
+            human="{task}\n\n文档内容：{document_content}"
+        )
         
         self.analysis_chain = LLMChain(
             llm=self.llm,
@@ -92,11 +111,15 @@ class BrainstormingAgent:
             verbose=True
         )
 
-    def process(self, document_content: str, callback=None) -> Dict[str, Any]:
+    def process(self, document_content: str, communication_purpose: str, callback=None) -> Dict[str, Any]:
         try:
+            logger.info(f"Processing document with purpose: {communication_purpose[:100]}...")
+            logger.info(f"Document content: {document_content[:100]}...")
+            
             # 准备输入
             chain_input = {
                 "document_content": document_content,
+                "communication_purpose": communication_purpose,
                 "task": self.prompt_templates.get_template('consultant_task')
             }
             
@@ -106,50 +129,232 @@ class BrainstormingAgent:
                 callbacks=[callback] if callback else None
             )
             
+            logger.info("Analysis completed successfully")
             return {
                 "status": "success",
                 "analysis_result": result["analysis_result"]
             }
                 
         except Exception as e:
+            logger.error(f"Error during processing: {str(e)}")
             return {
                 "status": "error",
                 "message": str(e)
             }
 
+
+def add_custom_css():
+    st.markdown("""
+    <style>
+    /* 标题样式 */
+    h1, h2, h3 {
+        color: #1e3a8a;
+        font-weight: 600;
+    }
+    
+    /* 卡片样式 */
+    .stTabs [data-baseweb="tab-panel"] {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        margin-top: 10px;
+    }
+    
+    /* 按钮样式 */
+    .stButton>button {
+        background-color: #1e3a8a;
+        color: white;
+        border-radius: 5px;
+        padding: 10px 20px;
+        font-weight: 500;
+        border: none;
+        width: 100%;
+    }
+    
+    .stButton>button:hover {
+        background-color: #2e4a9a;
+    }
+    
+    /* 输入框样式 */
+    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
+        border-radius: 5px;
+        border: 1px solid #ddd;
+    }
+    
+    /* 文件上传区域样式 */
+    .stFileUploader>div>button {
+        background-color: #f1f3f9;
+        color: #1e3a8a;
+        border: 1px dashed #1e3a8a;
+        border-radius: 5px;
+    }
+    
+    /* 成功消息样式 */
+    .stSuccess {
+        background-color: #d1fae5;
+        color: #065f46;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    /* 警告消息样式 */
+    .stWarning {
+        background-color: #fef3c7;
+        color: #92400e;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    /* 错误消息样式 */
+    .stError {
+        background-color: #fee2e2;
+        color: #b91c1c;
+        padding: 10px;
+        border-radius: 5px;
+    }
+    
+    /* 下拉选择框样式 */
+    .stSelectbox>div>div {
+        border-radius: 5px;
+        border: 1px solid #ddd;
+    }
+    
+    /* 页面标题样式 */
+    .page-title {
+        text-align: center;
+        font-size: 2rem;
+        margin-bottom: 20px;
+        color: #1e3a8a;
+        font-weight: bold;
+    }
+    
+    /* 卡片容器样式 */
+    .card-container {
+        background-color: white;
+        border-radius: 10px;
+        padding: 20px;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+        margin-bottom: 20px;
+        width: 100%;
+    }
+    
+    /* 分隔线样式 */
+    hr {
+        margin-top: 20px;
+        margin-bottom: 20px;
+        border: 0;
+        border-top: 1px solid #eee;
+    }
+    
+    /* 模型信息样式 */
+    .model-info {
+        background-color: #f0f7ff;
+        padding: 8px 12px;
+        border-radius: 5px;
+        margin-top: 10px;
+        margin-bottom: 15px;
+        display: inline-block;
+        font-size: 0.9rem;
+    }
+    
+    /* 表格样式优化 */
+    .dataframe {
+        width: 100%;
+        border-collapse: collapse;
+    }
+    
+    .dataframe th {
+        background-color: #f1f3f9;
+        padding: 8px;
+    }
+    
+    .dataframe td {
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+    }
+    
+    
+    
+    /* 调整列宽度 */
+    .column-adjust {
+        padding: 0 5px !important;
+    }
+    
+    /* 强制展开器内容宽度 */
+    .streamlit-expanderContent {
+        width: 100% !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+
+def read_docx(file_bytes):
+    """读取 Word 文档内容"""
+    try:
+        doc = Document(io.BytesIO(file_bytes))
+        full_text = []
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():  # 只添加非空段落
+                full_text.append(paragraph.text)
+        return "\n".join(full_text)
+    except Exception as e:
+        logger.error(f"读取 Word 文档时出错: {str(e)}")
+        return None
+
 def main():
-    st.set_page_config(page_title="咨询脑暴助理", layout="wide")
+    st.set_page_config(page_title="咨询脑暴平台", layout="wide")
+    add_custom_css()
+    st.markdown("<h1 class='page-title'>咨询脑暴平台</h1>", unsafe_allow_html=True)
     
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
     
-    tab1, tab2 = st.tabs(["咨询脑暴助理", "提示词设置"])
+    tab1, tab2 = st.tabs(["咨询沟通分析助理", "提示词设置"])
     
     with tab1:
-        st.title("咨询脑暴助理")
+        st.title("咨询沟通分析助理")
         
-        document_content = st.text_area(
-            "请输入需要分析的文档内容",
-            height=300,
-            placeholder="请输入需要分析的文档内容..."
+        # 添加文件上传功能
+        uploaded_file = st.file_uploader("上传咨询沟通记录文档", type=['docx'])
+        
+        # 沟通目的输入框
+        communication_purpose = st.text_area(
+            "请输入本次沟通的目的",
+            height=100,
+            placeholder="例如：了解学生的学业背景和留学意向，确认是否适合申请英国硕士项目..."
         )
         
-        if st.button("开始分析", key="start_analysis"):
+        # 处理上传的文件
+        if uploaded_file is not None:
+            document_content = read_docx(uploaded_file.read())
             if document_content:
+                st.success("沟通记录上传成功！")
+                with st.expander("查看沟通记录内容", expanded=False):
+                    st.write(document_content)
+            else:
+                st.error("无法读取文档内容，请检查文件格式是否正确。")
+        
+        if st.button("开始分析", key="start_analysis"):
+            if document_content and communication_purpose:
                 try:
                     agent = BrainstormingAgent(
                         api_key=st.secrets["OPENROUTER_API_KEY"],
                         prompt_templates=st.session_state.prompt_templates
                     )
                     
-                    with st.spinner("正在分析文档..."):
+                    with st.spinner("正在分析沟通记录..."):
                         st.subheader("🤔 分析过程")
                         with st.expander("查看详细分析过程", expanded=True):
                             callback = StreamlitCallbackHandler(st.container())
-                            result = agent.process(document_content, callback=callback)
+                            # 将沟通目的添加到处理参数中
+                            result = agent.process(
+                                document_content, 
+                                communication_purpose=communication_purpose,
+                                callback=callback
+                            )
                             
                             if result["status"] == "success":
-                                # 显示分析结果
                                 st.markdown("### 📊 分析结果")
                                 st.markdown(result["analysis_result"])
                             else:
@@ -158,7 +363,10 @@ def main():
                 except Exception as e:
                     st.error(f"处理过程中出错: {str(e)}")
             else:
-                st.warning("请先输入文档内容")
+                if not document_content:
+                    st.warning("请先上传沟通记录文档")
+                if not communication_purpose:
+                    st.warning("请输入本次沟通的目的")
     
     with tab2:
         st.title("提示词设置")
