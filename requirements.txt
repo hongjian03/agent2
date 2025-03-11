@@ -4,6 +4,6 @@ pandas==2.2.3
 requests==2.31.0
 openpyxl
 xlsxwriter
-langchain-openai==0.1.14
+langchain-openai
 pysqlite3-binary
 chromadb
