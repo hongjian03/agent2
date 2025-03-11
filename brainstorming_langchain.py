@@ -99,10 +99,13 @@ class BrainstormingAgent:
 
     def setup_chain(self):
         # 创建咨询分析链
-        consultant_prompt = ChatPromptTemplate.from_template(
-            system=self.prompt_templates.get_template('consultant_role'),
-            human="{task}\n\n文档内容：{document_content}"
-        )
+        consultant_prompt = ChatPromptTemplate.from_messages([
+            ("system", self.prompt_templates.get_template('consultant_role')),
+            ("human", self.prompt_templates.get_template('consultant_task').format(
+                communication_purpose="{communication_purpose}",
+                document_content="{document_content}"
+            ))
+        ])
         
         self.analysis_chain = LLMChain(
             llm=self.llm,
