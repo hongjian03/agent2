@@ -9,5 +9,4 @@ pysqlite3-binary
 chromadb
 langchain-community
 langchain-core
-docx
-exceptions
+python-docx
