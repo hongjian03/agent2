@@ -146,6 +146,9 @@ class BrainstormingAgent:
             base_url="https://openrouter.ai/api/v1"
         )
         self.prompt_templates = prompt_templates
+        # 保存示例数据的引用
+        self.demo1 = prompt_templates.demo1
+        self.demo2 = prompt_templates.demo2
         self.setup_chain()
 
     def setup_chain(self):
