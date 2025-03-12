@@ -19,7 +19,7 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-from demo import demo1, demo2
+from demo import DEMO1, DEMO2
 logger = logging.getLogger(__name__)
 
 # 记录程序启动
@@ -40,7 +40,10 @@ if 'sqlite_setup_done' not in st.session_state:
 
 class PromptTemplates:
     def __init__(self):
-        # 初始化默认模板
+        # 定义示例数据作为字符串
+        self.demo1 = DEMO1
+        self.demo2 = DEMO2
+
         self.default_templates = {
             'consultant_role': """
             你是一位资深的咨询顾问培训师，擅长分析咨询顾问与客户的沟通过程，提供专业的沟通技巧改进建议。
@@ -53,10 +56,15 @@ class PromptTemplates:
             """,
             
             'consultant_task': """
-            优秀案例模板：
+            以下是两个优秀案例的分析示例：
+
+            示例1：
             {demo1}
+
+            示例2：
             {demo2}
-            
+
+            请根据以上示例的分析方式，分析下面的案例：
             基于提供的沟通目的：{communication_purpose}
             沟通记录：{document_content}
             
@@ -111,11 +119,11 @@ class BrainstormingAgent:
         consultant_prompt = ChatPromptTemplate.from_messages([
             ("system", self.prompt_templates.get_template('consultant_role')),
             ("system", self.prompt_templates.get_template('output_format')),
-            ("human", self.prompt_templates.get_template('consultant_task').format(
-                communication_purpose="{communication_purpose}",
-                document_content="{document_content}"
-            ))
-        ])
+            ("human", self.prompt_templates.get_template('consultant_task'))
+        ]).partial(
+            demo1=self.demo1,
+            demo2=self.demo2
+        )
         
         self.analysis_chain = LLMChain(
             llm=self.llm,
