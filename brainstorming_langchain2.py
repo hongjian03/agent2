@@ -155,8 +155,8 @@ class BrainstormingAgent:
         # 创建咨询分析链
         consultant_prompt = ChatPromptTemplate.from_messages([
             ("system", self.prompt_templates.get_template('consultant_role')),
-            ("system", self.prompt_templates.get_template('output_format')),
-            ("human", self.prompt_templates.get_template('consultant_task'))
+            ("human", self.prompt_templates.get_template('consultant_task')),
+            ("system", self.prompt_templates.get_template('output_format'))
         ]).partial(
             demo1=self.demo1,
             demo2=self.demo2
