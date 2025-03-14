@@ -325,14 +325,32 @@ def add_custom_css():
 
 
 def read_docx(file_bytes):
-    """读取 Word 文档内容"""
+    """读取 Word 文档内容，包括表格"""
     try:
         doc = Document(io.BytesIO(file_bytes))
         full_text = []
+        
+        # 读取普通段落
         for paragraph in doc.paragraphs:
-            if paragraph.text.strip():  # 只添加非空段落
+            if paragraph.text.strip():
                 full_text.append(paragraph.text)
-        return "\n".join(full_text)
+        
+        # 读取表格内容
+        for table in doc.tables:
+            for row in table.rows:
+                # 获取每个单元格的文本
+                row_text = []
+                for cell in row.cells:
+                    if cell.text.strip():
+                        row_text.append(cell.text.strip())
+                if row_text:  # 只添加非空行
+                    # 使用制表符或其他分隔符连接单元格文本
+                    full_text.append(" | ".join(row_text))
+        
+        # 使用换行符连接所有文本
+        result = "\n".join(full_text)
+        logger.info(f"成功读取文档内容，包含 {len(doc.tables)} 个表格")
+        return result
     except Exception as e:
         logger.error(f"读取 Word 文档时出错: {str(e)}")
         return None
@@ -418,7 +436,7 @@ def main():
         prompt_templates = st.session_state.prompt_templates
         
         # Agent 1 设置
-        st.subheader("Agent 1 - 背景分析专家设置")
+        st.subheader("Agent 1 - 档案策略师")
         consultant_role1 = st.text_area(
             "角色设定",
             value=prompt_templates.get_template('consultant_role1'),
@@ -441,7 +459,7 @@ def main():
         )
 
         # Agent 2 设置
-        st.subheader("Agent 2 - 内容创作专家设置")
+        st.subheader("Agent 2 - 内容创作师")
         consultant_role2 = st.text_area(
             "角色设定",
             value=prompt_templates.get_template('consultant_role2'),
