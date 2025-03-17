@@ -52,18 +52,18 @@ class PromptTemplates:
         self.default_templates = {
             # Agent2 的模板
             'agent2': {
-                'consultant_role': """
+                'role2': """
                 你是一个专业的对话分析专家，可以区分对话的说话角色是老师还是学生。
                 你可以根据对话内容判断对话是否符合三段目标咨询法、热门问题、标准话术，是否流畅，互动频率如何。
                 你可以根据分析结果给出评分和改进建议。
                 """,
-                'output_format': """
+                'output_format2': """
                 请按照以下格式输出分析结果：
                 1、评分：
                 2、改进建议：
                 3、评分雷达图：
                 """,
-                'consultant_task': """
+                'task2': """
                 聊天记录：{document_content}
                 1. 根据聊天记录区分哪些是老师说的话，哪些是学生说的话，并且修正笔误。
                 2. 理解热门问题和标准话术{demo1}，判断对话是否符合热门问题、标准话术
@@ -79,7 +79,7 @@ class PromptTemplates:
             },
             # Agent1 的模板
             'agent1': {
-                'consultant_role': """
+                'role': """
                 # 角色
                 你是你是留学咨询机构的资深老师，负责培训留学顾问。
                 你的目标是对顾问的咨询质量进行分析和评价，让顾问明白自己在咨询中哪些方面要继续保持、哪些方面要改进优化。
@@ -94,7 +94,7 @@ class PromptTemplates:
 
                 """,
                 
-                'consultant_task': """
+                'task': """
                 以下是两个优秀案例的分析示例：
 
                 示例1：
@@ -193,8 +193,8 @@ class BrainstormingAgent:
     def setup_chain(self):
         # 创建咨询分析链
         consultant_prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompt_templates.get_template('consultant_role')),
-            ("human", self.prompt_templates.get_template('consultant_task')),
+            ("system", self.prompt_templates.get_template('role')),
+            ("human", self.prompt_templates.get_template('task')),
             ("system", self.prompt_templates.get_template('output_format'))
         ]).partial(
             demo1=self.demo3,
@@ -218,7 +218,6 @@ class BrainstormingAgent:
             chain_input = {
                 "document_content": document_content,
                 "communication_purpose": communication_purpose,
-                "task": self.prompt_templates.get_template('consultant_task')
             }
             
             # 执行分析
@@ -260,9 +259,9 @@ class Agent2:
     def setup_chain(self):
         # 创建三段目标咨询分析链
         analyzer_prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompt_templates.get_template('agent2', 'analyzer_role')),
-            ("human", self.prompt_templates.get_template('agent2', 'analyzer_task')),
-            ("system", self.prompt_templates.get_template('agent2', 'analyzer_format'))
+            ("system", self.prompt_templates.get_template('agent2', 'role2')),
+            ("human", self.prompt_templates.get_template('agent2', 'task2')),
+            ("system", self.prompt_templates.get_template('agent2', 'output_format2'))
         ]).partial(
             demo1=self.demo1,
             demo2=self.demo2,
@@ -467,6 +466,10 @@ def read_docx(file_bytes):
         return None
 
 def main():
+    langsmith_api_key = st.secrets["LANGCHAIN_API_KEY"]
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
+    os.environ["LANGCHAIN_PROJECT"] = "咨询脑暴平台"
     st.set_page_config(page_title="咨询脑暴平台", layout="wide")
     add_custom_css()
     st.markdown("<h1 class='page-title'>咨询脑暴平台</h1>", unsafe_allow_html=True)
@@ -556,7 +559,7 @@ def main():
             st.subheader("常规留学咨询提示词设置")
             consultant_role = st.text_area(
                 "角色设定",
-                value=st.session_state.prompt_templates.get_template('agent1', 'consultant_role'),
+                value=st.session_state.prompt_templates.get_template('agent1', 'role'),
                 height=200,
                 key="consultant_role"
             )
@@ -570,7 +573,7 @@ def main():
             
             consultant_task = st.text_area(
                 "任务说明",
-                value=st.session_state.prompt_templates.get_template('agent1', 'consultant_task'),
+                value=st.session_state.prompt_templates.get_template('agent1', 'task'),
                 height=200,
                 key="consultant_task"
             )
@@ -592,21 +595,21 @@ def main():
             st.subheader("三段目标咨询法提示词设置")
             analyzer_role = st.text_area(
                 "角色设定",
-                value=st.session_state.prompt_templates.get_template('agent2', 'analyzer_role'),
+                value=st.session_state.prompt_templates.get_template('agent2', 'role2'),
                 height=200,
                 key="analyzer_role"
             )
             
             analyzer_format = st.text_area(
                 "输出格式",
-                value=st.session_state.prompt_templates.get_template('agent2', 'analyzer_format'),
+                value=st.session_state.prompt_templates.get_template('agent2', 'output_format2'),
                 height=200,
                 key="analyzer_format"
             )
             
             analyzer_task = st.text_area(
                 "任务说明",
-                value=st.session_state.prompt_templates.get_template('agent2', 'analyzer_task'),
+                value=st.session_state.prompt_templates.get_template('agent2', 'task2'),
                 height=200,
                 key="analyzer_task"
             )
@@ -614,9 +617,9 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("更新提示词", key="update_agent2"):
-                    st.session_state.prompt_templates.update_template('agent2', 'analyzer_role', analyzer_role)
-                    st.session_state.prompt_templates.update_template('agent2', 'analyzer_format', analyzer_format)
-                    st.session_state.prompt_templates.update_template('agent2', 'analyzer_task', analyzer_task)
+                    st.session_state.prompt_templates.update_template('agent2', 'role2', analyzer_role)
+                    st.session_state.prompt_templates.update_template('agent2', 'output_format2', analyzer_format)
+                    st.session_state.prompt_templates.update_template('agent2', 'task2', analyzer_task)
                     st.success("✅ Agent2提示词已更新！")
             
             with col2:
