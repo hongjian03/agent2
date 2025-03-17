@@ -193,9 +193,9 @@ class BrainstormingAgent:
     def setup_chain(self):
         # 创建咨询分析链
         consultant_prompt = ChatPromptTemplate.from_messages([
-            ("system", self.prompt_templates.get_template('role')),
-            ("human", self.prompt_templates.get_template('task')),
-            ("system", self.prompt_templates.get_template('output_format'))
+            ("system", self.prompt_templates.get_template('agent1', 'role')),
+            ("human", self.prompt_templates.get_template('agent1', 'task')),
+            ("system", self.prompt_templates.get_template('agent1', 'output_format'))
         ]).partial(
             demo1=self.demo3,
             demo2=self.demo4,
