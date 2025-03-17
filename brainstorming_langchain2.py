@@ -185,6 +185,8 @@ class BrainstormingAgent:
         )
         self.prompt_templates = prompt_templates
         # 保存示例数据的引用
+        self.demo1 = prompt_templates.demo1
+        self.demo2 = prompt_templates.demo2
         self.demo3 = prompt_templates.demo3
         self.demo4 = prompt_templates.demo4
         self.demo5 = prompt_templates.demo5
@@ -197,9 +199,11 @@ class BrainstormingAgent:
             ("human", self.prompt_templates.get_template('agent1', 'task')),
             ("system", self.prompt_templates.get_template('agent1', 'output_format'))
         ]).partial(
-            demo1=self.demo3,
-            demo2=self.demo4,
-            demo3=self.demo5
+            demo1=self.demo1,
+            demo2=self.demo2,
+            demo3=self.demo3,
+            demo4=self.demo4,
+            demo5=self.demo5
         )
         
         self.analysis_chain = LLMChain(
