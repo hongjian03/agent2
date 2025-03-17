@@ -98,10 +98,10 @@ class PromptTemplates:
                 以下是两个优秀案例的分析示例：
 
                 示例1：
-                {demo1}
+                {demo3}
 
                 示例2：
-                {demo2}
+                {demo4}
 
                 请根据以上示例的分析方式，分析下面的案例：
                 基于提供的沟通目的：{communication_purpose}
