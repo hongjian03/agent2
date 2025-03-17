@@ -581,9 +581,9 @@ def main():
             col1, col2 = st.columns(2)
             with col1:
                 if st.button("更新提示词", key="update_agent1"):
-                    st.session_state.prompt_templates.update_template('agent1', 'consultant_role', consultant_role)
+                    st.session_state.prompt_templates.update_template('agent1', 'role', consultant_role)
                     st.session_state.prompt_templates.update_template('agent1', 'output_format', output_format)
-                    st.session_state.prompt_templates.update_template('agent1', 'consultant_task', consultant_task)
+                    st.session_state.prompt_templates.update_template('agent1', 'task', consultant_task)
                     st.success("✅ Agent1提示词已更新！")
             
             with col2:
