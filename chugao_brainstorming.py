@@ -155,10 +155,11 @@ class BrainstormingAgent:
             verbose=True
         )
 
-    def process(self, document_content: str, school_plan: str, callback=None) -> Dict[str, Any]:
+    def process_strategist(self, document_content: str, school_plan: str) -> Dict[str, Any]:
         try:
-            # 使用 StreamlitCallbackHandler 进行流式输出
-            streaming_handler = StreamlitCallbackHandler(st.container())
+            # 创建一个新的容器用于显示流式输出
+            output_container = st.empty()
+            streaming_handler = StreamlitCallbackHandler(output_container)
             
             # Run Profile Strategist
             strategist_result = self.strategist_chain(
@@ -169,24 +170,42 @@ class BrainstormingAgent:
                 callbacks=[streaming_handler]
             )
             
+            logger.info("Strategist analysis completed successfully")
+            return {
+                "status": "success",
+                "strategist_analysis": strategist_result["strategist_analysis"]
+            }
+                
+        except Exception as e:
+            logger.error(f"Strategist processing error: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
+    def process_creator(self, strategist_analysis: str, school_plan: str) -> Dict[str, Any]:
+        try:
+            # 创建一个新的容器用于显示流式输出
+            output_container = st.empty()
+            streaming_handler = StreamlitCallbackHandler(output_container)
+            
             # Run Content Creator
             creator_result = self.creator_chain(
                 {
-                    "strategist_analysis": strategist_result["strategist_analysis"],
+                    "strategist_analysis": strategist_analysis,
                     "school_plan": school_plan
                 },
                 callbacks=[streaming_handler]
             )
             
-            logger.info("Analysis completed successfully")
+            logger.info("Creator analysis completed successfully")
             return {
                 "status": "success",
-                "strategist_analysis": strategist_result["strategist_analysis"],
                 "creator_output": creator_result["creator_output"]
             }
                 
         except Exception as e:
-            logger.error(f"Error during processing: {str(e)}")
+            logger.error(f"Creator processing error: {str(e)}")
             return {
                 "status": "error",
                 "message": str(e)
@@ -431,7 +450,7 @@ def main():
             else:
                 st.error("无法读取文档内容，请检查文件格式是否正确。")
         
-        if st.button("开始分析", key="start_analysis"):
+        if st.button("开始背景分析", key="start_analysis"):
             if document_content:
                 try:
                     agent = BrainstormingAgent(
@@ -440,7 +459,6 @@ def main():
                     )
                     
                     # 创建两个独立的expander来显示分析过程和结果
-                    analysis_expander = st.expander("分析过程", expanded=True)
                     results_expander = st.expander("分析结果", expanded=True)
                     
                     with results_expander:
@@ -448,23 +466,33 @@ def main():
                         st.subheader("📊 第一阶段：背景分析")
                         
                         with st.spinner("正在进行背景分析..."):
-                            # 处理分析结果
-                            result = agent.process(document_content, school_plan)
+                            # 处理第一阶段分析
+                            result = agent.process_strategist(document_content, school_plan)
                             
                             if result["status"] == "success":
-                                # 显示策略分析结果
+                                # 保存策略分析结果到 session_state
+                                st.session_state.strategist_analysis = result["strategist_analysis"]
                                 st.markdown(result["strategist_analysis"])
                                 st.success("✅ 背景分析完成！")
                                 
-                                # 添加分隔线
-                                st.markdown("---")
-                                
-                                # 显示内容规划结果
-                                st.subheader("📝 第二阶段：内容规划")
-                                st.markdown(result["creator_output"])
-                                st.success("✅ 内容规划完成！")
+                                # 显示继续按钮
+                                if st.button("继续内容规划", key="continue_to_creator"):
+                                    # 第二阶段：内容规划
+                                    st.subheader("📝 第二阶段：内容规划")
+                                    
+                                    with st.spinner("正在进行内容规划..."):
+                                        creator_result = agent.process_creator(
+                                            st.session_state.strategist_analysis,
+                                            school_plan
+                                        )
+                                        
+                                        if creator_result["status"] == "success":
+                                            st.markdown(creator_result["creator_output"])
+                                            st.success("✅ 内容规划完成！")
+                                        else:
+                                            st.error(f"内容规划出错: {creator_result['message']}")
                             else:
-                                st.error(f"分析过程出错: {result['message']}")
+                                st.error(f"背景分析出错: {result['message']}")
                 
                 except Exception as e:
                     st.error(f"处理过程中出错: {str(e)}")
