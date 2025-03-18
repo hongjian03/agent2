@@ -193,12 +193,14 @@ class BrainstormingAgent:
                         },
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
-                    # 将结果存储在队列中
+                    # 将结果存储在线程对象中
+                    thread.result = result
                     message_queue.put("\n\n分析完成！")
                     return result
                 except Exception as e:
                     message_queue.put(f"\n\n错误: {str(e)}")
                     logger.error(f"Strategist processing error: {str(e)}")
+                    thread.exception = e
                     raise e
             
             # 启动线程
@@ -214,8 +216,8 @@ class BrainstormingAgent:
             thread.join()
             
             # 获取结果
-            if hasattr(thread, "_exception") and thread._exception:
-                raise thread._exception
+            if hasattr(thread, "exception") and thread.exception:
+                raise thread.exception
             
             logger.info("Strategist analysis completed successfully")
             
@@ -568,6 +570,7 @@ def main():
                     st.session_state.strategist_analysis_done = False
                     st.session_state.creator_analysis_done = False
                     st.session_state.show_creator_analysis = False
+                    st.rerun()  # 强制重新运行应用
                 else:
                     st.warning("请先上传初稿文档")
         
@@ -580,9 +583,10 @@ def main():
                 use_container_width=True
             )
             
-            if continue_button and st.session_state.strategist_analysis_done:
+            if continue_button:
                 st.session_state.show_creator_analysis = True
                 st.session_state.creator_analysis_done = False
+                st.rerun()  # 强制重新运行应用
         
         # 创建结果显示区域
         results_container = st.container()
@@ -609,6 +613,7 @@ def main():
                                 st.session_state.strategist_analysis_result = result["strategist_analysis"]
                                 st.session_state.strategist_analysis_done = True
                                 st.success("✅ 背景分析完成！")
+                                st.rerun()  # 强制重新运行应用以更新按钮状态
                             else:
                                 st.error(f"背景分析出错: {result['message']}")
                     
