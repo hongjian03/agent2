@@ -163,9 +163,13 @@ class BrainstormingAgent:
             class CustomCallbackHandler:
                 def __init__(self, queue):
                     self.queue = queue
+                    self.ignore_chain = False  # 添加 ignore_chain 属性
+                    self.ignore_llm = False    # 添加 ignore_llm 属性
+                    self.ignore_retry = False  # 添加 ignore_retry 属性
                 
                 def on_llm_new_token(self, token: str, **kwargs):
-                    self.queue.put(token)
+                    if not self.ignore_llm:
+                        self.queue.put(token)
                 
                 def on_llm_error(self, error: Exception, **kwargs):
                     self.queue.put(f"Error: {str(error)}")
@@ -187,6 +191,18 @@ class BrainstormingAgent:
                     pass
                 
                 def on_chain_error(self, *args, **kwargs):
+                    pass
+
+                def on_text(self, text: str, **kwargs) -> None:
+                    self.queue.put(text)
+                
+                def on_tool_start(self, *args, **kwargs):
+                    pass
+                
+                def on_tool_end(self, *args, **kwargs):
+                    pass
+                
+                def on_tool_error(self, *args, **kwargs):
                     pass
             
             # 实例化自定义回调处理器
