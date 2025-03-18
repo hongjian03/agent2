@@ -335,27 +335,49 @@ def add_custom_css():
 
 
 def read_docx(file_bytes):
-    """读取 Word 文档内容，包括表格"""
+    """读取 Word 文档内容，包括表格，并去除重复内容"""
     try:
         doc = Document(io.BytesIO(file_bytes))
+        content_set = set()  # 用于存储已处理的内容，避免重复
         full_text = []
         
         # 读取普通段落
         for paragraph in doc.paragraphs:
-            if paragraph.text.strip():
-                full_text.append(paragraph.text)
+            text = paragraph.text.strip()
+            if text and text not in content_set:  # 只添加非空且未重复的内容
+                content_set.add(text)
+                full_text.append(text)
         
         # 读取表格内容
         for table in doc.tables:
-            for row in table.rows:
-                # 获取每个单元格的文本
-                row_text = []
-                for cell in row.cells:
-                    if cell.text.strip():
-                        row_text.append(cell.text.strip())
-                if row_text:  # 只添加非空行
-                    # 使用制表符或其他分隔符连接单元格文本
-                    full_text.append(" | ".join(row_text))
+            table_content = []
+            header_row = []
+            
+            # 获取表头（第一行）
+            if table.rows:
+                for cell in table.rows[0].cells:
+                    header_text = cell.text.strip()
+                    if header_text:
+                        header_row.append(header_text)
+            
+            # 处理表格内容（从第二行开始）
+            for row_idx, row in enumerate(table.rows[1:], 1):
+                row_content = {}
+                for col_idx, cell in enumerate(row.cells):
+                    if col_idx < len(header_row):  # 确保有对应的表头
+                        cell_text = cell.text.strip()
+                        if cell_text:
+                            row_content[header_row[col_idx]] = cell_text
+                
+                if row_content:  # 只添加非空行
+                    formatted_row = " | ".join([f"{header}: {value}" 
+                                              for header, value in row_content.items()])
+                    if formatted_row not in content_set:  # 避免重复内容
+                        content_set.add(formatted_row)
+                        table_content.append(formatted_row)
+            
+            if table_content:
+                full_text.extend(table_content)
         
         # 使用换行符连接所有文本
         result = "\n".join(full_text)
@@ -398,8 +420,8 @@ def main():
         if uploaded_file is not None:
             document_content = read_docx(uploaded_file.read())
             if document_content:
-                st.success("沟通记录上传成功！")
-                with st.expander("查看沟通记录内容", expanded=False):
+                st.success("个人陈述上传成功！")
+                with st.expander("查看个人陈述内容", expanded=False):
                     st.write(document_content)
             else:
                 st.error("无法读取文档内容，请检查文件格式是否正确。")
