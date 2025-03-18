@@ -3,7 +3,8 @@ import json
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.schema import HumanMessage, SystemMessage
-from langchain.callbacks import StreamlitCallbackHandler
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.callbacks.streamlit import StreamlitCallbackHandler
 from langchain.chains import SequentialChain, LLMChain
 import os
 from typing import Dict, Any, List
@@ -156,57 +157,8 @@ class BrainstormingAgent:
 
     def process(self, document_content: str, school_plan: str, callback=None) -> Dict[str, Any]:
         try:
-            # 创建一个空的消息队列
-            message_queue = Queue()
-            
-            # 创建自定义回调处理器
-            class CustomCallbackHandler:
-                def __init__(self, queue):
-                    self.queue = queue
-                    self.ignore_chain = False  # 添加 ignore_chain 属性
-                    self.ignore_llm = False    # 添加 ignore_llm 属性
-                    self.ignore_retry = False  # 添加 ignore_retry 属性
-                
-                def on_llm_new_token(self, token: str, **kwargs):
-                    if not self.ignore_llm:
-                        self.queue.put(token)
-                
-                def on_llm_error(self, error: Exception, **kwargs):
-                    self.queue.put(f"Error: {str(error)}")
-                
-                def raise_error(self, error: Exception, **kwargs):
-                    logger.error(f"LLM Error: {str(error)}")
-                    raise error
-                
-                def on_llm_start(self, *args, **kwargs):
-                    pass
-                
-                def on_llm_end(self, *args, **kwargs):
-                    pass
-                
-                def on_chain_start(self, *args, **kwargs):
-                    pass
-                
-                def on_chain_end(self, *args, **kwargs):
-                    pass
-                
-                def on_chain_error(self, *args, **kwargs):
-                    pass
-
-                def on_text(self, text: str, **kwargs) -> None:
-                    self.queue.put(text)
-                
-                def on_tool_start(self, *args, **kwargs):
-                    pass
-                
-                def on_tool_end(self, *args, **kwargs):
-                    pass
-                
-                def on_tool_error(self, *args, **kwargs):
-                    pass
-            
-            # 实例化自定义回调处理器
-            streaming_handler = CustomCallbackHandler(message_queue)
+            # 使用 StreamlitCallbackHandler 进行流式输出
+            streaming_handler = StreamlitCallbackHandler(st.container())
             
             # Run Profile Strategist
             strategist_result = self.strategist_chain(
