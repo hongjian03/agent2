@@ -10,3 +10,5 @@ chromadb
 langchain-community
 langchain-core
 python-docx
+PyMuPDF
+PyPDF2
