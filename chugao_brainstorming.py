@@ -60,6 +60,7 @@ class PromptTemplates:
             """,
             
             'consultant_task1': """
+            根据选校方案先判断是否已选校，如果已选校，则结合选校方案进行后续分析
             分析学生的个人陈述表，提取关键信息与亮点
             根据申请国家和专业确定PS的写作大方向
             评估学生背景与目标专业的匹配度
@@ -85,6 +86,7 @@ class PromptTemplates:
             """,
             
             'consultant_task2': """
+            根据选校方案先判断是否已选校，如果已选校，则结合选校方案进行后续分析
             设计PS的整体框架和段落结构
             为每个段落规划内容要点和与专业的关联
             直接提供具体素材补充建议和实例
@@ -122,7 +124,9 @@ class BrainstormingAgent:
             ("system", f"{self.prompt_templates.get_template('consultant_role1')}\n\n"
                       f"任务:\n{self.prompt_templates.get_template('consultant_task1')}\n\n"
                       f"请按照以下格式输出:\n{self.prompt_templates.get_template('output_format1')}"),
-            ("human", "请分析以下学生个人陈述：\n\n{document_content}")
+            ("human", "选校方案：\n{school_plan}\n\n"
+             "请分析以下学生个人陈述：\n\n"
+             "个人陈述：\n{document_content}\n\n")
         ])
         
         self.strategist_chain = LLMChain(
@@ -137,7 +141,8 @@ class BrainstormingAgent:
             ("system", f"{self.prompt_templates.get_template('consultant_role2')}\n\n"
                       f"任务:\n{self.prompt_templates.get_template('consultant_task2')}\n\n"
                       f"请按照以下格式输出:\n{self.prompt_templates.get_template('output_format2')}"),
-            ("human", "基于第一阶段的分析结果：\n{strategist_analysis}\n\n请创建详细的内容规划。")
+            ("human", "选校方案：\n{school_plan}\n\n"
+                     "基于第一阶段的分析结果：\n{strategist_analysis}\n\n请创建详细的内容规划。")
         ])
         
         self.creator_chain = LLMChain(
@@ -147,19 +152,25 @@ class BrainstormingAgent:
             verbose=True
         )
 
-    def process(self, document_content: str, communication_purpose: str, callback=None) -> Dict[str, Any]:
+    def process(self, document_content: str, communication_purpose: str, school_plan: str, callback=None) -> Dict[str, Any]:
         try:
             logger.info(f"Processing document with purpose: {communication_purpose[:100]}...")
             
             # Run Profile Strategist
             strategist_result = self.strategist_chain(
-                {"document_content": document_content, "communication_purpose": communication_purpose},
+                {"document_content": document_content, 
+                 "communication_purpose": communication_purpose,
+                 "school_plan": school_plan
+                 },
                 callbacks=[callback] if callback else None
             )
             
             # Run Content Creator
             creator_result = self.creator_chain(
-                {"strategist_analysis": strategist_result["strategist_analysis"]},
+                {
+                    "strategist_analysis": strategist_result["strategist_analysis"],
+                    "school_plan": school_plan
+                },
                 callbacks=[callback] if callback else None
             )
             
@@ -356,6 +367,10 @@ def read_docx(file_bytes):
         return None
 
 def main():
+    langsmith_api_key = st.secrets["LANGCHAIN_API_KEY"]
+    os.environ["LANGCHAIN_TRACING_V2"] = "true"
+    os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
+    os.environ["LANGCHAIN_PROJECT"] = "初稿脑暴平台"
     st.set_page_config(page_title="初稿脑暴助理平台", layout="wide")
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
@@ -372,6 +387,13 @@ def main():
         # 添加文件上传功能
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])
         
+        # 添加选校方案输入框
+        school_plan = st.text_area(
+            "选校方案",
+            value="暂未选校",
+            height=100,
+            help="请输入已确定的选校方案，包括学校和专业信息"
+        )
         
         # 处理上传的文件
         if uploaded_file is not None:
@@ -404,21 +426,29 @@ def main():
                         st.subheader("📊 第一阶段：背景分析")
                         with st.spinner("正在进行背景分析..."):
                             strategist_result = agent.strategist_chain(
-                                {"document_content": document_content},
+                                {
+                                    "document_content": document_content,
+                                    "school_plan": school_plan
+                                },
                                 callbacks=[callback]
                             )
                             st.success("✅ 背景分析完成！")
                             st.markdown("### 背景分析结果")
                             st.code(strategist_result["strategist_analysis"], language="json")
-                            
-                            # 添加一个分隔线
-                            st.markdown("---")
-                            
+                        
+                        # 添加一个分隔线
+                        st.markdown("---")
+                        
+                        # 添加继续按钮
+                        if st.button("继续进行内容规划", key="continue_to_planning"):
                             # 第二阶段：内容规划
                             st.subheader("📝 第二阶段：内容规划")
                             with st.spinner("正在进行内容规划..."):
                                 creator_result = agent.creator_chain(
-                                    {"strategist_analysis": strategist_result["strategist_analysis"]},
+                                    {
+                                        "strategist_analysis": strategist_result["strategist_analysis"],
+                                        "school_plan": school_plan
+                                    },
                                     callbacks=[callback]
                                 )
                                 st.success("✅ 内容规划完成！")
