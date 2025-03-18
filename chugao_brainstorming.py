@@ -166,6 +166,28 @@ class BrainstormingAgent:
                 
                 def on_llm_new_token(self, token: str, **kwargs):
                     self.queue.put(token)
+                
+                def on_llm_error(self, error: Exception, **kwargs):
+                    self.queue.put(f"Error: {str(error)}")
+                
+                def raise_error(self, error: Exception, **kwargs):
+                    logger.error(f"LLM Error: {str(error)}")
+                    raise error
+                
+                def on_llm_start(self, *args, **kwargs):
+                    pass
+                
+                def on_llm_end(self, *args, **kwargs):
+                    pass
+                
+                def on_chain_start(self, *args, **kwargs):
+                    pass
+                
+                def on_chain_end(self, *args, **kwargs):
+                    pass
+                
+                def on_chain_error(self, *args, **kwargs):
+                    pass
             
             # 实例化自定义回调处理器
             streaming_handler = CustomCallbackHandler(message_queue)
