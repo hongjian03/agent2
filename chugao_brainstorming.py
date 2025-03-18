@@ -25,6 +25,7 @@ from threading import Thread
 import time
 from queue import Empty
 logger = logging.getLogger(__name__)
+from langchain.callbacks.base import BaseCallbackHandler
 
 # 记录程序启动
 logger.info("程序开始运行")
@@ -162,12 +163,13 @@ class BrainstormingAgent:
             # 创建一个队列用于流式输出
             message_queue = Queue()
             
-            # 创建自定义回调处理器
-            class QueueCallback:
+            # 创建自定义回调处理器，继承自 BaseCallbackHandler
+            class QueueCallbackHandler(BaseCallbackHandler):
                 def __init__(self, queue):
                     self.queue = queue
+                    super().__init__()
                 
-                def on_llm_new_token(self, token: str, **kwargs):
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
             # 创建一个生成器函数，用于流式输出
@@ -189,7 +191,7 @@ class BrainstormingAgent:
                             "document_content": document_content, 
                             "school_plan": school_plan
                         },
-                        callbacks=[QueueCallback(message_queue)]
+                        callbacks=[QueueCallbackHandler(message_queue)]
                     )
                     # 将结果存储在队列中
                     message_queue.put("\n\n分析完成！")
@@ -229,18 +231,18 @@ class BrainstormingAgent:
                 "status": "error",
                 "message": str(e)
             }
-
     def process_creator(self, strategist_analysis: str, school_plan: str) -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
             
-            # 创建自定义回调处理器
-            class QueueCallback:
+            # 创建自定义回调处理器，继承自 BaseCallbackHandler
+            class QueueCallbackHandler(BaseCallbackHandler):
                 def __init__(self, queue):
                     self.queue = queue
-                
-                def on_llm_new_token(self, token: str, **kwargs):
+                    super().__init__()
+            
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
             # 创建一个生成器函数，用于流式输出
@@ -262,7 +264,7 @@ class BrainstormingAgent:
                             "strategist_analysis": strategist_analysis,
                             "school_plan": school_plan
                         },
-                        callbacks=[QueueCallback(message_queue)]
+                        callbacks=[QueueCallbackHandler(message_queue)]
                     )
                     # 将结果存储在队列中
                     message_queue.put("\n\n规划完成！")
