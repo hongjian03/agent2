@@ -152,14 +152,13 @@ class BrainstormingAgent:
             verbose=True
         )
 
-    def process(self, document_content: str, communication_purpose: str, school_plan: str, callback=None) -> Dict[str, Any]:
+    def process(self, document_content: str, school_plan: str, callback=None) -> Dict[str, Any]:
         try:
-            logger.info(f"Processing document with purpose: {communication_purpose[:100]}...")
+            
             
             # Run Profile Strategist
             strategist_result = self.strategist_chain(
                 {"document_content": document_content, 
-                 "communication_purpose": communication_purpose,
                  "school_plan": school_plan
                  },
                 callbacks=[callback] if callback else None
