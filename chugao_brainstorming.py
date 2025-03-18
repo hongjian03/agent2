@@ -113,7 +113,8 @@ class BrainstormingAgent:
             temperature=0.7,
             model=st.secrets["OPENROUTER_MODEL"],
             api_key=api_key,
-            base_url="https://openrouter.ai/api/v1"
+            base_url="https://openrouter.ai/api/v1",
+            streaming=True
         )
         self.prompt_templates = prompt_templates
         self.setup_chains()
@@ -445,17 +446,33 @@ def main():
                     with results_expander:
                         # 第一阶段：背景分析
                         st.subheader("📊 第一阶段：背景分析")
+                        
+                        # 创建空容器用于流式输出
+                        analysis_container = st.empty()
+                        
                         with st.spinner("正在进行背景分析..."):
+                            # 创建一个变量来存储累积的输出
+                            accumulated_text = ""
+                            
+                            def streaming_callback(text):
+                                nonlocal accumulated_text
+                                accumulated_text += text
+                                # 使用 markdown 格式更新容器内容
+                                analysis_container.markdown(f"```json\n{accumulated_text}\n```")
+                            
+                            # 创建自定义回调处理器
+                            class StreamingCallbackHandler(StreamlitCallbackHandler):
+                                def on_llm_new_token(self, token: str, **kwargs) -> None:
+                                    streaming_callback(token)
+                            
                             strategist_result = agent.strategist_chain(
                                 {
                                     "document_content": document_content,
                                     "school_plan": school_plan
                                 },
-                                callbacks=[callback]
+                                callbacks=[StreamingCallbackHandler()]
                             )
                             st.success("✅ 背景分析完成！")
-                            st.markdown("### 背景分析结果")
-                            st.code(strategist_result["strategist_analysis"], language="json")
                         
                         # 添加一个分隔线
                         st.markdown("---")
@@ -464,17 +481,20 @@ def main():
                         if st.button("继续进行内容规划", key="continue_to_planning"):
                             # 第二阶段：内容规划
                             st.subheader("📝 第二阶段：内容规划")
+                            
+                            # 创建新的空容器用于第二阶段的流式输出
+                            planning_container = st.empty()
+                            accumulated_text = ""
+                            
                             with st.spinner("正在进行内容规划..."):
                                 creator_result = agent.creator_chain(
                                     {
                                         "strategist_analysis": strategist_result["strategist_analysis"],
                                         "school_plan": school_plan
                                     },
-                                    callbacks=[callback]
+                                    callbacks=[StreamingCallbackHandler()]
                                 )
                                 st.success("✅ 内容规划完成！")
-                                st.markdown("### 内容规划结果")
-                                st.code(creator_result["creator_output"], language="json")
                 
                 except Exception as e:
                     st.error(f"处理过程中出错: {str(e)}")
