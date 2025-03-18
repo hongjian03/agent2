@@ -168,7 +168,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-            
+                
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
@@ -210,7 +210,7 @@ class BrainstormingAgent:
             # 使用 st.write_stream 显示流式输出
             output_container = st.empty()
             with output_container:
-                st.write_stream(token_generator())
+                full_response = st.write_stream(token_generator())
             
             # 等待线程完成
             thread.join()
@@ -219,14 +219,12 @@ class BrainstormingAgent:
             if hasattr(thread, "exception") and thread.exception:
                 raise thread.exception
             
-            # 获取原始输出
-            raw_output = thread.result["strategist_analysis"] if hasattr(thread, "result") else ""
-            
             logger.info("Strategist analysis completed successfully")
             
+            # 从 full_response 中提取分析结果
             return {
                 "status": "success",
-                "strategist_analysis": raw_output
+                "strategist_analysis": full_response
             }
                 
         except Exception as e:
@@ -270,14 +268,12 @@ class BrainstormingAgent:
                         },
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
-                    # 将结果存储在线程对象中
-                    thread.result = result
+                    # 将结果存储在队列中
                     message_queue.put("\n\n规划完成！")
                     return result
                 except Exception as e:
                     message_queue.put(f"\n\n错误: {str(e)}")
                     logger.error(f"Creator processing error: {str(e)}")
-                    thread.exception = e
                     raise e
             
             # 启动线程
@@ -287,23 +283,20 @@ class BrainstormingAgent:
             # 使用 st.write_stream 显示流式输出
             output_container = st.empty()
             with output_container:
-                st.write_stream(token_generator())
+                full_response = st.write_stream(token_generator())
             
             # 等待线程完成
             thread.join()
             
             # 获取结果
-            if hasattr(thread, "exception") and thread.exception:
-                raise thread.exception
-            
-            # 获取原始输出
-            raw_output = thread.result["creator_output"] if hasattr(thread, "result") else ""
+            if hasattr(thread, "_exception") and thread._exception:
+                raise thread._exception
             
             logger.info("Creator analysis completed successfully")
             
             return {
                 "status": "success",
-                "creator_output": raw_output
+                "creator_output": full_response
             }
                 
         except Exception as e:
@@ -627,7 +620,8 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    # 如果已经完成，不需要再次显示结果，因为流式输出已经显示了
+                    # 如果已经完成，直接显示结果
+                    st.markdown(st.session_state.strategist_analysis_result)
                     st.success("✅ 背景分析完成！")
         
         # 显示内容规划（如果需要）
@@ -659,7 +653,8 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    # 如果已经完成，不需要再次显示结果，因为流式输出已经显示了
+                    # 如果已经完成，直接显示结果
+                    st.markdown(st.session_state.creator_analysis_result)
                     st.success("✅ 内容规划完成！")
     
     with tab2:
