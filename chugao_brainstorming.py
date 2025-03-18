@@ -22,6 +22,8 @@ logging.basicConfig(
 )
 from queue import Queue
 from threading import Thread
+import time
+from queue import Empty
 logger = logging.getLogger(__name__)
 
 # 记录程序启动
@@ -157,23 +159,68 @@ class BrainstormingAgent:
 
     def process_strategist(self, document_content: str, school_plan: str) -> Dict[str, Any]:
         try:
-            # 创建一个新的容器用于显示流式输出
-            output_container = st.empty()
-            streaming_handler = StreamlitCallbackHandler(output_container)
+            # 创建一个队列用于流式输出
+            message_queue = Queue()
             
-            # Run Profile Strategist
-            strategist_result = self.strategist_chain(
-                {
-                    "document_content": document_content, 
-                    "school_plan": school_plan
-                },
-                callbacks=[streaming_handler]
-            )
+            # 创建自定义回调处理器
+            class QueueCallback:
+                def __init__(self, queue):
+                    self.queue = queue
+                
+                def on_llm_new_token(self, token: str, **kwargs):
+                    self.queue.put(token)
+            
+            # 创建一个生成器函数，用于流式输出
+            def token_generator():
+                while True:
+                    try:
+                        token = message_queue.get(block=False)
+                        yield token
+                    except Empty:
+                        if not thread.is_alive() and message_queue.empty():
+                            break
+                    time.sleep(0.01)
+            
+            # 在单独的线程中运行LLM
+            def run_llm():
+                try:
+                    result = self.strategist_chain(
+                        {
+                            "document_content": document_content, 
+                            "school_plan": school_plan
+                        },
+                        callbacks=[QueueCallback(message_queue)]
+                    )
+                    # 将结果存储在队列中
+                    message_queue.put("\n\n分析完成！")
+                    return result
+                except Exception as e:
+                    message_queue.put(f"\n\n错误: {str(e)}")
+                    logger.error(f"Strategist processing error: {str(e)}")
+                    raise e
+            
+            # 启动线程
+            thread = Thread(target=run_llm)
+            thread.start()
+            
+            # 使用 st.write_stream 显示流式输出
+            output_container = st.empty()
+            with output_container:
+                full_response = st.write_stream(token_generator())
+            
+            # 等待线程完成
+            thread.join()
+            
+            # 获取结果
+            if hasattr(thread, "_exception") and thread._exception:
+                raise thread._exception
             
             logger.info("Strategist analysis completed successfully")
+            
+            # 从 full_response 中提取分析结果
             return {
                 "status": "success",
-                "strategist_analysis": strategist_result["strategist_analysis"]
+                "strategist_analysis": full_response
             }
                 
         except Exception as e:
@@ -185,23 +232,67 @@ class BrainstormingAgent:
 
     def process_creator(self, strategist_analysis: str, school_plan: str) -> Dict[str, Any]:
         try:
-            # 创建一个新的容器用于显示流式输出
-            output_container = st.empty()
-            streaming_handler = StreamlitCallbackHandler(output_container)
+            # 创建一个队列用于流式输出
+            message_queue = Queue()
             
-            # Run Content Creator
-            creator_result = self.creator_chain(
-                {
-                    "strategist_analysis": strategist_analysis,
-                    "school_plan": school_plan
-                },
-                callbacks=[streaming_handler]
-            )
+            # 创建自定义回调处理器
+            class QueueCallback:
+                def __init__(self, queue):
+                    self.queue = queue
+                
+                def on_llm_new_token(self, token: str, **kwargs):
+                    self.queue.put(token)
+            
+            # 创建一个生成器函数，用于流式输出
+            def token_generator():
+                while True:
+                    try:
+                        token = message_queue.get(block=False)
+                        yield token
+                    except Empty:
+                        if not thread.is_alive() and message_queue.empty():
+                            break
+                    time.sleep(0.01)
+            
+            # 在单独的线程中运行LLM
+            def run_llm():
+                try:
+                    result = self.creator_chain(
+                        {
+                            "strategist_analysis": strategist_analysis,
+                            "school_plan": school_plan
+                        },
+                        callbacks=[QueueCallback(message_queue)]
+                    )
+                    # 将结果存储在队列中
+                    message_queue.put("\n\n规划完成！")
+                    return result
+                except Exception as e:
+                    message_queue.put(f"\n\n错误: {str(e)}")
+                    logger.error(f"Creator processing error: {str(e)}")
+                    raise e
+            
+            # 启动线程
+            thread = Thread(target=run_llm)
+            thread.start()
+            
+            # 使用 st.write_stream 显示流式输出
+            output_container = st.empty()
+            with output_container:
+                full_response = st.write_stream(token_generator())
+            
+            # 等待线程完成
+            thread.join()
+            
+            # 获取结果
+            if hasattr(thread, "_exception") and thread._exception:
+                raise thread._exception
             
             logger.info("Creator analysis completed successfully")
+            
             return {
                 "status": "success",
-                "creator_output": creator_result["creator_output"]
+                "creator_output": full_response
             }
                 
         except Exception as e:
