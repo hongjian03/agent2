@@ -447,31 +447,28 @@ def main():
                         # 第一阶段：背景分析
                         st.subheader("📊 第一阶段：背景分析")
                         
-                        # 创建空容器用于流式输出
-                        analysis_container = st.empty()
-                        
                         with st.spinner("正在进行背景分析..."):
-                            # 创建一个变量来存储累积的输出
-                            accumulated_text = ""
+                            # 创建一个队列用于流式输出
+                            from queue import Queue
+                            from threading import Thread
                             
-                            def streaming_callback(text):
-                                nonlocal accumulated_text
-                                accumulated_text += text
-                                # 使用 markdown 格式更新容器内容
-                                analysis_container.markdown(f"```json\n{accumulated_text}\n```")
+                            message_queue = Queue()
                             
                             # 创建自定义回调处理器
                             class StreamingCallbackHandler(StreamlitCallbackHandler):
                                 def on_llm_new_token(self, token: str, **kwargs) -> None:
-                                    streaming_callback(token)
+                                    message_queue.put(token)
                             
-                            strategist_result = agent.strategist_chain(
-                                {
-                                    "document_content": document_content,
-                                    "school_plan": school_plan
-                                },
-                                callbacks=[StreamingCallbackHandler()]
-                            )
+                            # 创建流式输出
+                            with st.write_stream(message_queue) as stream:
+                                strategist_result = agent.strategist_chain(
+                                    {
+                                        "document_content": document_content,
+                                        "school_plan": school_plan
+                                    },
+                                    callbacks=[StreamingCallbackHandler()]
+                                )
+                            
                             st.success("✅ 背景分析完成！")
                         
                         # 添加一个分隔线
@@ -482,18 +479,20 @@ def main():
                             # 第二阶段：内容规划
                             st.subheader("📝 第二阶段：内容规划")
                             
-                            # 创建新的空容器用于第二阶段的流式输出
-                            planning_container = st.empty()
-                            accumulated_text = ""
-                            
                             with st.spinner("正在进行内容规划..."):
-                                creator_result = agent.creator_chain(
-                                    {
-                                        "strategist_analysis": strategist_result["strategist_analysis"],
-                                        "school_plan": school_plan
-                                    },
-                                    callbacks=[StreamingCallbackHandler()]
-                                )
+                                # 重置队列
+                                message_queue = Queue()
+                                
+                                # 创建新的流式输出
+                                with st.write_stream(message_queue) as stream:
+                                    creator_result = agent.creator_chain(
+                                        {
+                                            "strategist_analysis": strategist_result["strategist_analysis"],
+                                            "school_plan": school_plan
+                                        },
+                                        callbacks=[StreamingCallbackHandler()]
+                                    )
+                                
                                 st.success("✅ 内容规划完成！")
                 
                 except Exception as e:
