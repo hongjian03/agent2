@@ -19,7 +19,8 @@ logging.basicConfig(
         logging.StreamHandler(sys.stdout)
     ]
 )
-
+from queue import Queue
+from threading import Thread
 logger = logging.getLogger(__name__)
 
 # 记录程序启动
@@ -155,14 +156,27 @@ class BrainstormingAgent:
 
     def process(self, document_content: str, school_plan: str, callback=None) -> Dict[str, Any]:
         try:
+            # 创建一个空的消息队列
+            message_queue = Queue()
             
+            # 创建自定义回调处理器
+            class CustomCallbackHandler:
+                def __init__(self, queue):
+                    self.queue = queue
+                
+                def on_llm_new_token(self, token: str, **kwargs):
+                    self.queue.put(token)
+            
+            # 实例化自定义回调处理器
+            streaming_handler = CustomCallbackHandler(message_queue)
             
             # Run Profile Strategist
             strategist_result = self.strategist_chain(
-                {"document_content": document_content, 
-                 "school_plan": school_plan
-                 },
-                callbacks=[callback] if callback else None
+                {
+                    "document_content": document_content, 
+                    "school_plan": school_plan
+                },
+                callbacks=[streaming_handler]
             )
             
             # Run Content Creator
@@ -171,7 +185,7 @@ class BrainstormingAgent:
                     "strategist_analysis": strategist_result["strategist_analysis"],
                     "school_plan": school_plan
                 },
-                callbacks=[callback] if callback else None
+                callbacks=[streaming_handler]
             )
             
             logger.info("Analysis completed successfully")
@@ -439,61 +453,28 @@ def main():
                     analysis_expander = st.expander("分析过程", expanded=True)
                     results_expander = st.expander("分析结果", expanded=True)
                     
-                    with analysis_expander:
-                        st.subheader("🤔 分析过程")
-                        callback = StreamlitCallbackHandler(st.container())
-                    
                     with results_expander:
                         # 第一阶段：背景分析
                         st.subheader("📊 第一阶段：背景分析")
                         
                         with st.spinner("正在进行背景分析..."):
-                            # 创建一个队列用于流式输出
-                            from queue import Queue
-                            from threading import Thread
+                            # 处理分析结果
+                            result = agent.process(document_content, school_plan)
                             
-                            message_queue = Queue()
-                            
-                            # 创建自定义回调处理器
-                            class StreamingCallbackHandler(StreamlitCallbackHandler):
-                                def on_llm_new_token(self, token: str, **kwargs) -> None:
-                                    message_queue.put(token)
-                            
-                            # 创建流式输出
-                            with st.write_stream(message_queue) as stream:
-                                strategist_result = agent.strategist_chain(
-                                    {
-                                        "document_content": document_content,
-                                        "school_plan": school_plan
-                                    },
-                                    callbacks=[StreamingCallbackHandler()]
-                                )
-                            
-                            st.success("✅ 背景分析完成！")
-                        
-                        # 添加一个分隔线
-                        st.markdown("---")
-                        
-                        # 添加继续按钮
-                        if st.button("继续进行内容规划", key="continue_to_planning"):
-                            # 第二阶段：内容规划
-                            st.subheader("📝 第二阶段：内容规划")
-                            
-                            with st.spinner("正在进行内容规划..."):
-                                # 重置队列
-                                message_queue = Queue()
+                            if result["status"] == "success":
+                                # 显示策略分析结果
+                                st.markdown(result["strategist_analysis"])
+                                st.success("✅ 背景分析完成！")
                                 
-                                # 创建新的流式输出
-                                with st.write_stream(message_queue) as stream:
-                                    creator_result = agent.creator_chain(
-                                        {
-                                            "strategist_analysis": strategist_result["strategist_analysis"],
-                                            "school_plan": school_plan
-                                        },
-                                        callbacks=[StreamingCallbackHandler()]
-                                    )
+                                # 添加分隔线
+                                st.markdown("---")
                                 
+                                # 显示内容规划结果
+                                st.subheader("📝 第二阶段：内容规划")
+                                st.markdown(result["creator_output"])
                                 st.success("✅ 内容规划完成！")
+                            else:
+                                st.error(f"分析过程出错: {result['message']}")
                 
                 except Exception as e:
                     st.error(f"处理过程中出错: {str(e)}")
