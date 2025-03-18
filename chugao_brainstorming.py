@@ -12,6 +12,10 @@ import logging
 import sys
 from docx import Document
 import io
+import base64
+from PyPDF2 import PdfReader
+from PIL import Image
+import fitz  # PyMuPDF
 # 配置日志记录
 logging.basicConfig(
     level=logging.INFO,
@@ -46,9 +50,31 @@ if 'sqlite_setup_done' not in st.session_state:
 class PromptTemplates:
     def __init__(self):
         # 定义示例数据作为字符串
-
-
         self.default_templates = {
+            'transcript_role': """
+            # 角色
+            你是专业的成绩单分析师，擅长从成绩单中提取关键信息并进行分析。
+            """,
+            
+            'transcript_task': """
+            分析学生的成绩单，提取以下信息：
+            1. 学生的GPA和成绩分布情况
+            2. 主要课程的成绩表现
+            3. 学术优势和劣势
+            4. 成绩趋势（是否有进步或下滑）
+            5. 与申请专业相关课程的表现
+            """,
+            
+            'transcript_output': """
+            成绩单分析:
+                GPA和总体表现: [GPA和总体成绩分布]
+                主要课程成绩: [列出主要课程及成绩]
+                学术优势: [分析学生的学术优势]
+                学术劣势: [分析学生的学术劣势]
+                成绩趋势: [分析成绩的变化趋势]
+                与申请专业相关性: [分析与申请专业相关课程的表现]
+            """,
+            
             'consultant_role1': """
             # 角色
             你是资深留学顾问，精通学生背景分析和各国院校招生政策。
@@ -67,6 +93,7 @@ class PromptTemplates:
             'consultant_task1': """
             根据选校方案先判断是否已选校，如果已选校，则结合选校方案进行后续分析
             分析学生的个人陈述表，提取关键信息与亮点
+            如果有成绩单分析，结合成绩单分析结果进行综合评估
             根据申请国家和专业确定PS的写作大方向
             评估学生背景与目标专业的匹配度
             制定个性化文书策略，确定核心卖点
@@ -112,6 +139,139 @@ class PromptTemplates:
     def reset_to_default(self):
         st.session_state.templates = self.default_templates.copy()
 
+class TranscriptAnalyzer:
+    def __init__(self, api_key: str, prompt_templates: PromptTemplates):
+        # 使用OpenRouter API访问模型
+        self.llm = ChatOpenAI(
+            temperature=0.7,
+            model=st.secrets["TRANSCRIPT_MODEL"],  # 从secrets中获取模型名称
+            api_key=api_key,
+            base_url="https://openrouter.ai/api/v1",
+            streaming=True
+        )
+        self.prompt_templates = prompt_templates
+    
+    def extract_images_from_pdf(self, pdf_bytes):
+        """从PDF中提取图像"""
+        try:
+            images = []
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # 将页面直接转换为图像
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                img_bytes = pix.tobytes("png")
+                # 将图像编码为base64字符串
+                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                images.append(img_base64)
+            
+            return images
+        except Exception as e:
+            logger.error(f"提取PDF图像时出错: {str(e)}")
+            return []
+    
+    def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
+        try:
+            # 创建一个队列用于流式输出
+            message_queue = Queue()
+            
+            # 创建自定义回调处理器
+            class QueueCallbackHandler(BaseCallbackHandler):
+                def __init__(self, queue):
+                    self.queue = queue
+                    super().__init__()
+                
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
+                    self.queue.put(token)
+            
+            # 创建一个生成器函数，用于流式输出
+            def token_generator():
+                while True:
+                    try:
+                        token = message_queue.get(block=False)
+                        yield token
+                    except Empty:
+                        if not thread.is_alive() and message_queue.empty():
+                            break
+                    time.sleep(0.01)
+            
+            # 在单独的线程中运行分析
+            def run_analysis():
+                try:
+                    # 提取PDF中的图像
+                    images = self.extract_images_from_pdf(pdf_bytes)
+                    
+                    if not images:
+                        message_queue.put("无法从PDF中提取图像，请检查文件格式。")
+                        return
+                    
+                    # 构建提示词
+                    system_prompt = f"{self.prompt_templates.get_template('transcript_role')}\n\n" \
+                                   f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
+                                   f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
+                    
+                    # 将图像转换为文本描述
+                    image_descriptions = [f"[图像 {i+1}: 成绩单页面]" for i in range(len(images))]
+                    image_text = "\n".join(image_descriptions)
+                    
+                    user_prompt = f"选校方案：\n{school_plan}\n\n" \
+                                 f"请分析以下成绩单图像，提取关键信息并进行分析。\n\n" \
+                                 f"成绩单包含以下页面：\n{image_text}"
+                    
+                    # 创建提示模板
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", system_prompt),
+                        ("human", user_prompt)
+                    ])
+                    
+                    # 调用LLM进行分析
+                    chain = LLMChain(llm=self.llm, prompt=prompt)
+                    result = chain.run(
+                        {},
+                        callbacks=[QueueCallbackHandler(message_queue)]
+                    )
+                    
+                    message_queue.put("\n\n成绩单分析完成！")
+                    thread.result = result
+                    return result
+                    
+                except Exception as e:
+                    message_queue.put(f"\n\n错误: {str(e)}")
+                    logger.error(f"成绩单分析错误: {str(e)}")
+                    thread.exception = e
+                    raise e
+            
+            # 启动线程
+            thread = Thread(target=run_analysis)
+            thread.start()
+            
+            # 使用 st.write_stream 显示流式输出
+            output_container = st.empty()
+            with output_container:
+                full_response = st.write_stream(token_generator())
+            
+            # 等待线程完成
+            thread.join()
+            
+            # 获取结果
+            if hasattr(thread, "exception") and thread.exception:
+                raise thread.exception
+            
+            logger.info("成绩单分析完成")
+            
+            return {
+                "status": "success",
+                "transcript_analysis": full_response
+            }
+                
+        except Exception as e:
+            logger.error(f"成绩单分析错误: {str(e)}")
+            return {
+                "status": "error",
+                "message": str(e)
+            }
+
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
         self.llm = ChatOpenAI(
@@ -131,8 +291,8 @@ class BrainstormingAgent:
                       f"任务:\n{self.prompt_templates.get_template('consultant_task1')}\n\n"
                       f"请按照以下格式输出:\n{self.prompt_templates.get_template('output_format1')}"),
             ("human", "选校方案：\n{school_plan}\n\n"
-             "请分析以下学生个人陈述：\n\n"
-             "个人陈述：\n{document_content}\n\n")
+                     "请分析以下学生个人陈述：\n\n"
+                     "个人陈述：\n{document_content}")
         ])
         
         self.strategist_chain = LLMChain(
@@ -142,13 +302,16 @@ class BrainstormingAgent:
             verbose=True
         )
 
-        # Content Creator Chain
+        # Content Creator Chain - 更新提示词以包含成绩单分析和自定义需求
         creator_prompt = ChatPromptTemplate.from_messages([
             ("system", f"{self.prompt_templates.get_template('consultant_role2')}\n\n"
                       f"任务:\n{self.prompt_templates.get_template('consultant_task2')}\n\n"
                       f"请按照以下格式输出:\n{self.prompt_templates.get_template('output_format2')}"),
             ("human", "选校方案：\n{school_plan}\n\n"
-                     "基于第一阶段的分析结果：\n{strategist_analysis}\n\n请创建详细的内容规划。")
+                     "基于第一阶段的分析结果：\n{strategist_analysis}\n\n"
+                     "成绩单分析结果：\n{transcript_analysis}\n\n"
+                     "额外定制需求：\n{custom_requirements}\n\n"
+                     "请创建详细的内容规划。")
         ])
         
         self.creator_chain = LLMChain(
@@ -158,7 +321,7 @@ class BrainstormingAgent:
             verbose=True
         )
 
-    def process_strategist(self, document_content: str, school_plan: str) -> Dict[str, Any]:
+    def process_strategist(self, document_content: str, school_plan: str, transcript_analysis: str = "") -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
@@ -189,7 +352,8 @@ class BrainstormingAgent:
                     result = self.strategist_chain(
                         {
                             "document_content": document_content, 
-                            "school_plan": school_plan
+                            "school_plan": school_plan,
+                            "transcript_analysis": transcript_analysis
                         },
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
@@ -233,7 +397,7 @@ class BrainstormingAgent:
                 "status": "error",
                 "message": str(e)
             }
-    def process_creator(self, strategist_analysis: str, school_plan: str) -> Dict[str, Any]:
+    def process_creator(self, strategist_analysis: str, school_plan: str, transcript_analysis: str = "", custom_requirements: str = "无定制需求") -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
@@ -264,7 +428,9 @@ class BrainstormingAgent:
                     result = self.creator_chain(
                         {
                             "strategist_analysis": strategist_analysis,
-                            "school_plan": school_plan
+                            "school_plan": school_plan,
+                            "transcript_analysis": transcript_analysis,
+                            "custom_requirements": custom_requirements
                         },
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
@@ -524,6 +690,12 @@ def main():
     # 初始化会话状态变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
+    if 'transcript_file' not in st.session_state:
+        st.session_state.transcript_file = None
+    if 'transcript_analysis_done' not in st.session_state:
+        st.session_state.transcript_analysis_done = False
+    if 'transcript_analysis_result' not in st.session_state:
+        st.session_state.transcript_analysis_result = None
     if 'strategist_analysis_done' not in st.session_state:
         st.session_state.strategist_analysis_done = False
     if 'strategist_analysis_result' not in st.session_state:
@@ -532,14 +704,20 @@ def main():
         st.session_state.creator_analysis_done = False
     if 'creator_analysis_result' not in st.session_state:
         st.session_state.creator_analysis_result = None
+    if 'show_transcript_analysis' not in st.session_state:
+        st.session_state.show_transcript_analysis = False
     if 'show_strategist_analysis' not in st.session_state:
         st.session_state.show_strategist_analysis = False
     if 'show_creator_analysis' not in st.session_state:
         st.session_state.show_creator_analysis = False
     
     with tab1:
+        # 添加成绩单上传功能
+        transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+        
         # 添加文件上传功能
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])
+        
         # 添加选校方案输入框
         school_plan = st.text_area(
             "选校方案",
@@ -547,6 +725,25 @@ def main():
             height=100,
             help="请输入已确定的选校方案，包括学校和专业信息"
         )
+        
+        # 添加自定义需求输入框
+        custom_requirements = st.text_area(
+            "定制需求（可选）",
+            value="无定制需求",
+            height=100,
+            help="请输入特殊的定制需求，如果没有可以保持默认值"
+        )
+        
+        # 处理上传的成绩单
+        if transcript_file is not None:
+            st.session_state.transcript_file = transcript_file.read()
+            st.success("成绩单上传成功！")
+            
+            # 添加处理成绩单按钮
+            if st.button("处理成绩单", key="process_transcript"):
+                st.session_state.show_transcript_analysis = True
+                st.session_state.transcript_analysis_done = False
+                st.rerun()
         
         # 处理上传的文件
         if uploaded_file is not None:
@@ -591,6 +788,41 @@ def main():
         # 创建结果显示区域
         results_container = st.container()
         
+        # 显示成绩单分析（如果需要）
+        if st.session_state.show_transcript_analysis:
+            with results_container:
+                st.markdown("---")
+                st.subheader("📊 成绩单分析")
+                
+                if not st.session_state.transcript_analysis_done:
+                    try:
+                        transcript_analyzer = TranscriptAnalyzer(
+                            api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
+                            prompt_templates=st.session_state.prompt_templates
+                        )
+                        
+                        with st.spinner("正在分析成绩单..."):
+                            # 处理成绩单分析
+                            result = transcript_analyzer.analyze_transcript(
+                                st.session_state.transcript_file, 
+                                school_plan
+                            )
+                            
+                            if result["status"] == "success":
+                                # 保存成绩单分析结果到 session_state
+                                st.session_state.transcript_analysis_result = result["transcript_analysis"]
+                                st.session_state.transcript_analysis_done = True
+                                st.success("✅ 成绩单分析完成！")
+                            else:
+                                st.error(f"成绩单分析出错: {result['message']}")
+                    
+                    except Exception as e:
+                        st.error(f"处理过程中出错: {str(e)}")
+                else:
+                    # 如果已经完成，直接显示结果
+                    st.markdown(st.session_state.transcript_analysis_result)
+                    st.success("✅ 成绩单分析完成！")
+        
         # 显示背景分析（如果需要）
         if st.session_state.show_strategist_analysis:
             with results_container:
@@ -605,8 +837,17 @@ def main():
                         )
                         
                         with st.spinner("正在进行背景分析..."):
+                            # 获取成绩单分析结果（如果有）
+                            transcript_analysis = ""
+                            if st.session_state.transcript_analysis_done:
+                                transcript_analysis = st.session_state.transcript_analysis_result
+                            
                             # 处理第一阶段分析
-                            result = agent.process_strategist(st.session_state.document_content, school_plan)
+                            result = agent.process_strategist(
+                                st.session_state.document_content, 
+                                school_plan,
+                                transcript_analysis
+                            )
                             
                             if result["status"] == "success":
                                 # 保存策略分析结果到 session_state
@@ -640,7 +881,9 @@ def main():
                         with st.spinner("正在进行内容规划..."):
                             creator_result = agent.process_creator(
                                 st.session_state.strategist_analysis_result,
-                                school_plan
+                                school_plan,
+                                st.session_state.transcript_analysis_result,
+                                custom_requirements
                             )
                             
                             if creator_result["status"] == "success":
@@ -662,6 +905,29 @@ def main():
         
         prompt_templates = st.session_state.prompt_templates
         
+        # 成绩单分析设置
+        st.subheader("成绩单分析")
+        transcript_role = st.text_area(
+            "角色设定",
+            value=prompt_templates.get_template('transcript_role'),
+            height=200,
+            key="transcript_role"
+        )
+        
+        transcript_task = st.text_area(
+            "任务说明",
+            value=prompt_templates.get_template('transcript_task'),
+            height=200,
+            key="transcript_task"
+        )
+        
+        transcript_output = st.text_area(
+            "输出格式",
+            value=prompt_templates.get_template('transcript_output'),
+            height=200,
+            key="transcript_output"
+        )
+        
         # Agent 1 设置
         st.subheader("Agent 1 - 档案策略师")
         consultant_role1 = st.text_area(
@@ -671,13 +937,6 @@ def main():
             key="consultant_role1"
         )
         
-        output_format1 = st.text_area(
-            "输出格式",
-            value=prompt_templates.get_template('output_format1'),
-            height=200,
-            key="output_format1"
-        )
-        
         consultant_task1 = st.text_area(
             "任务说明",
             value=prompt_templates.get_template('consultant_task1'),
@@ -685,6 +944,12 @@ def main():
             key="consultant_task1"
         )
 
+        output_format1 = st.text_area(
+            "输出格式",
+            value=prompt_templates.get_template('output_format1'),
+            height=200,
+            key="output_format1"
+        )
         # Agent 2 设置
         st.subheader("Agent 2 - 内容创作师")
         consultant_role2 = st.text_area(
@@ -693,7 +958,14 @@ def main():
             height=200,
             key="consultant_role2"
         )
-        
+
+        consultant_task2 = st.text_area(
+            "任务说明",
+            value=prompt_templates.get_template('consultant_task2'),
+            height=200,
+            key="consultant_task2"
+        )
+
         output_format2 = st.text_area(
             "输出格式",
             value=prompt_templates.get_template('output_format2'),
@@ -701,16 +973,12 @@ def main():
             key="output_format2"
         )
         
-        consultant_task2 = st.text_area(
-            "任务说明",
-            value=prompt_templates.get_template('consultant_task2'),
-            height=200,
-            key="consultant_task2"
-        )
-        
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
+                prompt_templates.update_template('transcript_role', transcript_role)
+                prompt_templates.update_template('transcript_task', transcript_task)
+                prompt_templates.update_template('transcript_output', transcript_output)
                 prompt_templates.update_template('consultant_role1', consultant_role1)
                 prompt_templates.update_template('output_format1', output_format1)
                 prompt_templates.update_template('consultant_task1', consultant_task1)
