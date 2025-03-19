@@ -107,7 +107,7 @@ class PromptTemplates:
             'output_format2': """
             文书框架: 
                 整体结构: 文书整体结构概述
-                段落规划: 
+                段落规划:  
                     段落目的: 这段要达成的目标
                     核心内容: 应包含的关键信息
                     素材建议: 
@@ -685,7 +685,8 @@ def main():
         st.session_state.prompt_templates = PromptTemplates()
     
     tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
-    st.markdown(f"<div class='model-info'>🤖 当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     # 初始化会话状态变量
     if 'document_content' not in st.session_state:
