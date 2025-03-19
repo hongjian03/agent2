@@ -681,14 +681,11 @@ def main():
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
+    # 确保在使用前初始化 prompt_templates
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
-    
-    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
-    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
-    
-    # 初始化会话状态变量
+        
+    # 初始化其他 session state 变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
     if 'transcript_file' not in st.session_state:
@@ -711,6 +708,10 @@ def main():
         st.session_state.show_strategist_analysis = False
     if 'show_creator_analysis' not in st.session_state:
         st.session_state.show_creator_analysis = False
+    
+    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
+    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     with tab1:
         # 添加成绩单上传功能
