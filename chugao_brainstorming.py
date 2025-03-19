@@ -679,6 +679,44 @@ def main():
     os.environ["LANGCHAIN_PROJECT"] = "初稿脑暴平台"
     st.set_page_config(page_title="初稿脑暴助理平台", layout="wide")
     add_custom_css()
+    
+    # 初始化所有需要的 session_state 变量
+    if "templates" not in st.session_state:
+        logger.info("初始化默认模板到 session_state")
+        prompt_templates = PromptTemplates()
+        st.session_state.templates = prompt_templates.default_templates.copy()
+    
+    # 初始化其他 session_state 变量
+    if "strategist_analysis_done" not in st.session_state:
+        st.session_state.strategist_analysis_done = False
+    
+    if "creator_analysis_done" not in st.session_state:
+        st.session_state.creator_analysis_done = False
+    
+    if "show_strategist_analysis" not in st.session_state:
+        st.session_state.show_strategist_analysis = False
+    
+    if "show_creator_analysis" not in st.session_state:
+        st.session_state.show_creator_analysis = False
+    
+    if "show_transcript_analysis" not in st.session_state:
+        st.session_state.show_transcript_analysis = False
+    
+    if "transcript_analysis_done" not in st.session_state:
+        st.session_state.transcript_analysis_done = False
+    
+    if "transcript_analysis_result" not in st.session_state:
+        st.session_state.transcript_analysis_result = ""
+    
+    if "strategist_analysis_result" not in st.session_state:
+        st.session_state.strategist_analysis_result = ""
+    
+    if "creator_analysis_result" not in st.session_state:
+        st.session_state.creator_analysis_result = ""
+    
+    if "document_content" not in st.session_state:
+        st.session_state.document_content = ""
+    
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
     # 创建标签页
