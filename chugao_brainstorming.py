@@ -680,9 +680,13 @@ def main():
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
-    # 确保在使用前初始化 prompt_templates
+    # 初始化 prompt_templates 对象
+    prompt_templates = PromptTemplates()
+    
+    # 确保在使用前初始化 prompt_templates 到 session_state
     if 'prompt_templates' not in st.session_state:
-        st.session_state.prompt_templates = PromptTemplates()
+        st.session_state.prompt_templates = prompt_templates
+    
     # 初始化其他 session state 变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
