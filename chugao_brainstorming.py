@@ -682,11 +682,13 @@ def main():
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
     # 初始化 prompt_templates 对象
-    prompt_templates = PromptTemplates()
+    if 'templates' not in st.session_state:
+        prompt_templates = PromptTemplates()
+        st.session_state.templates = prompt_templates.default_templates.copy()
     
     # 确保在使用前初始化 prompt_templates 到 session_state
     if 'prompt_templates' not in st.session_state:
-        st.session_state.prompt_templates = prompt_templates
+        st.session_state.prompt_templates = PromptTemplates()
     
     # 初始化其他 session state 变量
     if 'document_content' not in st.session_state:
@@ -746,6 +748,11 @@ def main():
             
             # 添加处理成绩单按钮
             if st.button("处理成绩单", key="process_transcript"):
+                # 确保模板已初始化
+                if 'templates' not in st.session_state:
+                    prompt_templates = PromptTemplates()
+                    st.session_state.templates = prompt_templates.default_templates.copy()
+                
                 st.session_state.show_transcript_analysis = True
                 st.session_state.transcript_analysis_done = False
                 st.rerun()
