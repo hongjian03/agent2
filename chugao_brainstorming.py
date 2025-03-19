@@ -141,10 +141,13 @@ class PromptTemplates:
 
 class TranscriptAnalyzer:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
-        # 使用OpenRouter API访问模型
+        # 添加安全检查
+        if not hasattr(st.session_state, 'templates'):
+            st.session_state.templates = prompt_templates.default_templates.copy()
+            
         self.llm = ChatOpenAI(
             temperature=0.7,
-            model=st.secrets["TRANSCRIPT_MODEL"],  # 从secrets中获取模型名称
+            model=st.secrets["TRANSCRIPT_MODEL"],
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             streaming=True
@@ -680,6 +683,18 @@ def main():
     st.set_page_config(page_title="初稿脑暴助理平台", layout="wide")
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
+    
+    # 添加调试信息
+    st.write("Session state contents:", st.session_state)
+    if 'templates' in st.session_state:
+        st.write("Templates found:", st.session_state.templates)
+    else:
+        st.write("Templates not found in session state")
+    
+    # 确保在任何操作之前初始化 PromptTemplates
+    if 'templates' not in st.session_state:
+        prompt_templates = PromptTemplates()
+        st.session_state.templates = prompt_templates.default_templates.copy()
     
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
