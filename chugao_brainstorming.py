@@ -406,7 +406,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-            
+                
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
