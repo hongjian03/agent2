@@ -683,8 +683,6 @@ def main():
     # 确保在使用前初始化 prompt_templates
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
-    if 'templates' not in st.session_state:
-        st.session_state.templates = PromptTemplates()
     # 初始化其他 session state 变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
@@ -801,7 +799,7 @@ def main():
                         # 确保正确传递 prompt_templates 对象
                         transcript_analyzer = TranscriptAnalyzer(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates  # 确保这里使用正确的对象
+                            prompt_templates=st.session_state.prompt_templates
                         )
                         
                         with st.spinner("正在分析成绩单..."):
