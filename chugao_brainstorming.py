@@ -53,17 +53,26 @@ class PromptTemplates:
         self.default_templates = {
             'transcript_role': """
             # 角色
-            你是成绩单图像识别专家，擅长从成绩单图像中识别出学生的成绩信息
+            你是专业的成绩单分析师，擅长从成绩单中提取关键信息并进行分析。
             """,
             
             'transcript_task': """
-            分析学生的成绩单图像，以文字形式输出学生的成绩信息
- 
+            分析学生的成绩单，提取以下信息：
+            1. 学生的GPA和成绩分布情况
+            2. 主要课程的成绩表现
+            3. 学术优势和劣势
+            4. 成绩趋势（是否有进步或下滑）
+            5. 与申请专业相关课程的表现
             """,
             
             'transcript_output': """
-            成绩单：
-
+            成绩单分析:
+                GPA和总体表现: [GPA和总体成绩分布]
+                主要课程成绩: [列出主要课程及成绩]
+                学术优势: [分析学生的学术优势]
+                学术劣势: [分析学生的学术劣势]
+                成绩趋势: [分析成绩的变化趋势]
+                与申请专业相关性: [分析与申请专业相关课程的表现]
             """,
             
             'consultant_role1': """
@@ -122,7 +131,6 @@ class PromptTemplates:
             st.session_state.templates = self.default_templates.copy()
 
     def get_template(self, template_name: str) -> str:
-        # 确保从 st.session_state.templates 获取模板
         return st.session_state.templates.get(template_name, "")
 
     def update_template(self, template_name: str, new_content: str) -> None:
@@ -203,37 +211,30 @@ class TranscriptAnalyzer:
                                    f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
                                    f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
                     
-                    # 准备消息列表，包含系统消息和用户消息
-                    messages = [
-                        SystemMessage(content=system_prompt),
-                    ]
+                    # 将图像转换为文本描述
+                    image_descriptions = [f"[图像 {i+1}: 成绩单页面]" for i in range(len(images))]
+                    image_text = "\n".join(image_descriptions)
                     
-                    # 添加用户消息，包含文本和图像
-                    user_content = [
-                        
-                    ]
+                    user_prompt = f"选校方案：\n{school_plan}\n\n" \
+                                 f"请分析以下成绩单图像，提取关键信息并进行分析。\n\n" \
+                                 f"成绩单包含以下页面：\n{image_text}"
                     
-                    # 添加图像到用户消息
-                    for i, img_base64 in enumerate(images):
-                        user_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{img_base64}",
-                                "detail": "high"
-                            }
-                        })
-                    
-                    messages.append(HumanMessage(content=user_content))
+                    # 创建提示模板
+                    prompt = ChatPromptTemplate.from_messages([
+                        ("system", system_prompt),
+                        ("human", user_prompt)
+                    ])
                     
                     # 调用LLM进行分析
-                    result = self.llm.invoke(
-                        messages,
+                    chain = LLMChain(llm=self.llm, prompt=prompt)
+                    result = chain.run(
+                        {},
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
                     
                     message_queue.put("\n\n成绩单分析完成！")
-                    thread.result = result.content
-                    return result.content
+                    thread.result = result
+                    return result
                     
                 except Exception as e:
                     message_queue.put(f"\n\n错误: {str(e)}")
@@ -680,10 +681,14 @@ def main():
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
-    # 确保在使用前初始化 prompt_templates
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
-    # 初始化其他 session state 变量
+    
+    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
+    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
+    
+    # 初始化会话状态变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
     if 'transcript_file' not in st.session_state:
@@ -706,10 +711,6 @@ def main():
         st.session_state.show_strategist_analysis = False
     if 'show_creator_analysis' not in st.session_state:
         st.session_state.show_creator_analysis = False
-    
-    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
-    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     with tab1:
         # 添加成绩单上传功能
@@ -796,9 +797,8 @@ def main():
                 
                 if not st.session_state.transcript_analysis_done:
                     try:
-                        # 确保正确传递 prompt_templates 对象
                         transcript_analyzer = TranscriptAnalyzer(
-                            api_key=st.secrets["OPENROUTER_API_KEY"],
+                            api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
                             prompt_templates=st.session_state.prompt_templates
                         )
                         
