@@ -140,7 +140,6 @@ class TranscriptAnalyzer:
             base_url="https://openrouter.ai/api/v1",
             streaming=True
         )
-        # 直接存储模板字典
         self.templates = prompt_templates
     
     def extract_images_from_pdf(self, pdf_bytes):
@@ -165,6 +164,43 @@ class TranscriptAnalyzer:
     
     def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
         try:
+            # 提取PDF中的图像
+            images = self.extract_images_from_pdf(pdf_bytes)
+            
+            if not images:
+                return {
+                    "status": "error",
+                    "message": "无法从PDF中提取图像，请检查文件格式。"
+                }
+            
+            # 构建系统消息内容
+            system_content = (
+                f"{self.templates['transcript_role']}\n\n"
+                f"任务:\n{self.templates['transcript_task']}\n\n"
+                f"请按照以下格式输出:\n{self.templates['transcript_output']}"
+            )
+            
+            # 创建消息列表
+            messages = [
+                SystemMessage(content=system_content),
+                HumanMessage(content=f"选校方案：\n{school_plan}")
+            ]
+            
+            # 添加图像到用户消息
+            user_content = []
+            for i, img_base64 in enumerate(images):
+                user_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{img_base64}",
+                        "detail": "high"
+                    }
+                })
+            
+            # 添加包含图像的消息
+            if user_content:
+                messages.append(HumanMessage(content=user_content))
+            
             # 创建一个队列用于流式输出
             message_queue = Queue()
             
@@ -177,92 +213,17 @@ class TranscriptAnalyzer:
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
-            # 创建一个生成器函数，用于流式输出
-            def token_generator():
-                while True:
-                    try:
-                        token = message_queue.get(block=False)
-                        yield token
-                    except Empty:
-                        if not thread.is_alive() and message_queue.empty():
-                            break
-                    time.sleep(0.01)
+            # 调用LLM进行分析
+            result = self.llm.invoke(
+                messages,
+                callbacks=[QueueCallbackHandler(message_queue)]
+            )
             
-            # 在单独的线程中运行分析
-            def run_analysis():
-                try:
-                    # 提取PDF中的图像
-                    images = self.extract_images_from_pdf(pdf_bytes)
-                    
-                    if not images:
-                        message_queue.put("无法从PDF中提取图像，请检查文件格式。")
-                        return
-                    
-                    # 使用 ChatPromptTemplate 构建提示词
-                    system_prompt = ChatPromptTemplate.from_messages([
-                        ("system", f"{self.templates['transcript_role']}\n\n"
-                                  f"任务:\n{self.templates['transcript_task']}\n\n"
-                                  f"请按照以下格式输出:\n{self.templates['transcript_output']}"),
-                        ("human", "")
-                    ])
-                    
-                    # 准备消息列表
-                    messages = [
-                        SystemMessage(content=system_prompt),
-                    ]
-                    
-                    # 添加用户消息，包含文本和图像
-                    user_content = []
-                    
-                    # 添加图像到用户消息
-                    for i, img_base64 in enumerate(images):
-                        user_content.append({
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:image/png;base64,{img_base64}",
-                                "detail": "high"
-                            }
-                        })
-                    
-                    messages.append(HumanMessage(content=user_content))
-                    
-                    # 调用LLM进行分析
-                    result = self.llm.invoke(
-                        messages,
-                        callbacks=[QueueCallbackHandler(message_queue)]
-                    )
-                    
-                    message_queue.put("\n\n成绩单分析完成！")
-                    thread.result = result.content
-                    return result.content
-                    
-                except Exception as e:
-                    message_queue.put(f"\n\n错误: {str(e)}")
-                    logger.error(f"成绩单分析错误: {str(e)}")
-                    thread.exception = e
-                    raise e
-            
-            # 启动线程
-            thread = Thread(target=run_analysis)
-            thread.start()
-            
-            # 使用 st.write_stream 显示流式输出
-            output_container = st.empty()
-            with output_container:
-                full_response = st.write_stream(token_generator())
-            
-            # 等待线程完成
-            thread.join()
-            
-            # 获取结果
-            if hasattr(thread, "exception") and thread.exception:
-                raise thread.exception
-            
-            logger.info("成绩单分析完成")
+            message_queue.put("\n\n成绩单分析完成！")
             
             return {
                 "status": "success",
-                "transcript_analysis": full_response
+                "transcript_analysis": result.content
             }
                 
         except Exception as e:
