@@ -132,69 +132,132 @@ class PromptTemplates:
         st.session_state.templates = self.default_templates.copy()
 
 class TranscriptAnalyzer:
-    def __init__(self, api_key: str, prompt_templates: Dict[str, str]):
+    def __init__(self, api_key: str, prompt_templates: PromptTemplates):
+        # 使用OpenRouter API访问模型
         self.llm = ChatOpenAI(
             temperature=0.7,
-            model=st.secrets["TRANSCRIPT_MODEL"],
+            model=st.secrets["TRANSCRIPT_MODEL"],  # 从secrets中获取模型名称
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             streaming=True
         )
-        self.templates = prompt_templates
+        self.prompt_templates = prompt_templates
     
-    def analyze_transcript(self, pdf_bytes) -> Dict[str, Any]:
+    def extract_images_from_pdf(self, pdf_bytes):
+        """从PDF中提取图像"""
+        try:
+            images = []
+            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+            
+            for page_num in range(len(pdf_document)):
+                page = pdf_document[page_num]
+                # 将页面直接转换为图像
+                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                img_bytes = pix.tobytes("png")
+                # 将图像编码为base64字符串
+                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                images.append(img_base64)
+            
+            return images
+        except Exception as e:
+            logger.error(f"提取PDF图像时出错: {str(e)}")
+            return []
+    
+    def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
             
             # 创建自定义回调处理器
-            callback_handler = QueueCallbackHandler(message_queue)
+            class QueueCallbackHandler(BaseCallbackHandler):
+                def __init__(self, queue):
+                    self.queue = queue
+                    super().__init__()
+                
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
+                    self.queue.put(token)
             
-            # 构建系统消息内容
-            system_content = (
-                f"{self.templates['transcript_role']}\n\n"
-                f"任务:\n{self.templates['transcript_task']}\n\n"
-                f"请按照以下格式输出:\n{self.templates['transcript_output']}"
-            )
+            # 创建一个生成器函数，用于流式输出
+            def token_generator():
+                while True:
+                    try:
+                        token = message_queue.get(block=False)
+                        yield token
+                    except Empty:
+                        if not thread.is_alive() and message_queue.empty():
+                            break
+                    time.sleep(0.01)
             
-            # 创建消息列表，只包含系统消息
-            messages = [
-                SystemMessage(content=system_content)
-            ]
+            # 在单独的线程中运行分析
+            def run_analysis():
+                try:
+                    # 提取PDF中的图像
+                    images = self.extract_images_from_pdf(pdf_bytes)
+                    
+                    if not images:
+                        message_queue.put("无法从PDF中提取图像，请检查文件格式。")
+                        return
+                    
+                    # 构建提示词
+                    system_prompt = f"{self.prompt_templates.get_template('transcript_role')}\n\n" \
+                                   f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
+                                   f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
+                    
+                    # 准备消息列表，包含系统消息和用户消息
+                    messages = [
+                        SystemMessage(content=system_prompt),
+                    ]
+                    
+                    # 添加用户消息，包含文本和图像
+                    user_content = [
+                        
+                    ]
+                    
+                    # 添加图像到用户消息
+                    for i, img_base64 in enumerate(images):
+                        user_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{img_base64}",
+                                "detail": "high"
+                            }
+                        })
+                    
+                    messages.append(HumanMessage(content=user_content))
+                    
+                    # 调用LLM进行分析
+                    result = self.llm.invoke(
+                        messages,
+                        callbacks=[QueueCallbackHandler(message_queue)]
+                    )
+                    
+                    message_queue.put("\n\n成绩单分析完成！")
+                    thread.result = result.content
+                    return result.content
+                    
+                except Exception as e:
+                    message_queue.put(f"\n\n错误: {str(e)}")
+                    logger.error(f"成绩单分析错误: {str(e)}")
+                    thread.exception = e
+                    raise e
             
-            # 处理 PDF 并添加图像
-            images = convert_pdf_to_images(pdf_bytes)
-            user_content = []
-            for i, img_base64 in enumerate(images):
-                user_content.append({
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/png;base64,{img_base64}",
-                        "detail": "high"
-                    }
-                })
-            
-            # 添加包含图像的消息
-            if user_content:
-                messages.append(HumanMessage(content=user_content))
-            
-            # 创建一个新的 ChatOpenAI 实例，专门用于这次调用
-            llm_with_callback = ChatOpenAI(
-                temperature=0.7,
-                model=st.secrets["TRANSCRIPT_MODEL"],
-                api_key=st.secrets["OPENROUTER_API_KEY"],
-                base_url="https://openrouter.ai/api/v1",
-                streaming=True,
-                callbacks=[callback_handler]
-            )
-            
-            # 调用LLM进行分析
-            result = llm_with_callback.invoke(messages)
+            # 启动线程
+            thread = Thread(target=run_analysis)
+            thread.start()
             
             # 使用 st.write_stream 显示流式输出
             output_container = st.empty()
             with output_container:
-                full_response = st.write_stream(token_generator(message_queue))
+                full_response = st.write_stream(token_generator())
+            
+            # 等待线程完成
+            thread.join()
+            
+            # 获取结果
+            if hasattr(thread, "exception") and thread.exception:
+                raise thread.exception
+            
+            logger.info("成绩单分析完成")
             
             return {
                 "status": "success",
@@ -207,15 +270,6 @@ class TranscriptAnalyzer:
                 "status": "error",
                 "message": str(e)
             }
-
-# 将 QueueCallbackHandler 移到类外部
-class QueueCallbackHandler(BaseCallbackHandler):
-    def __init__(self, queue):
-        self.queue = queue
-        super().__init__()
-    
-    def on_llm_new_token(self, token: str, **kwargs) -> None:
-        self.queue.put(token)
 
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
@@ -352,7 +406,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-                
+            
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
@@ -624,92 +678,42 @@ def main():
     os.environ["LANGCHAIN_PROJECT"] = "初稿脑暴平台"
     st.set_page_config(page_title="初稿脑暴助理平台", layout="wide")
     add_custom_css()
-    
-    # 初始化所有需要的 session_state 变量
-    if "templates" not in st.session_state:
-        logger.info("初始化默认模板到 session_state")
-        prompt_templates = PromptTemplates()
-        st.session_state.templates = prompt_templates.default_templates.copy()
-    
-    # 初始化其他 session_state 变量
-    if "strategist_analysis_done" not in st.session_state:
-        st.session_state.strategist_analysis_done = False
-    
-    if "creator_analysis_done" not in st.session_state:
-        st.session_state.creator_analysis_done = False
-    
-    if "show_strategist_analysis" not in st.session_state:
-        st.session_state.show_strategist_analysis = False
-    
-    if "show_creator_analysis" not in st.session_state:
-        st.session_state.show_creator_analysis = False
-    
-    if "show_transcript_analysis" not in st.session_state:
-        st.session_state.show_transcript_analysis = False
-    
-    if "transcript_analysis_done" not in st.session_state:
-        st.session_state.transcript_analysis_done = False
-    
-    if "transcript_analysis_result" not in st.session_state:
-        st.session_state.transcript_analysis_result = ""
-    
-    if "strategist_analysis_result" not in st.session_state:
-        st.session_state.strategist_analysis_result = ""
-    
-    if "creator_analysis_result" not in st.session_state:
-        st.session_state.creator_analysis_result = ""
-    
-    if "document_content" not in st.session_state:
-        st.session_state.document_content = ""
-    
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
-    # 创建标签页
-    tab1, tab2 = st.tabs(["主页面", "提示词设置"])
+    # 确保在使用前初始化 prompt_templates
+    if 'prompt_templates' not in st.session_state:
+        st.session_state.prompt_templates = PromptTemplates()
+    # 初始化其他 session state 变量
+    if 'document_content' not in st.session_state:
+        st.session_state.document_content = None
+    if 'transcript_file' not in st.session_state:
+        st.session_state.transcript_file = None
+    if 'transcript_analysis_done' not in st.session_state:
+        st.session_state.transcript_analysis_done = False
+    if 'transcript_analysis_result' not in st.session_state:
+        st.session_state.transcript_analysis_result = None
+    if 'strategist_analysis_done' not in st.session_state:
+        st.session_state.strategist_analysis_done = False
+    if 'strategist_analysis_result' not in st.session_state:
+        st.session_state.strategist_analysis_result = None
+    if 'creator_analysis_done' not in st.session_state:
+        st.session_state.creator_analysis_done = False
+    if 'creator_analysis_result' not in st.session_state:
+        st.session_state.creator_analysis_result = None
+    if 'show_transcript_analysis' not in st.session_state:
+        st.session_state.show_transcript_analysis = False
+    if 'show_strategist_analysis' not in st.session_state:
+        st.session_state.show_strategist_analysis = False
+    if 'show_creator_analysis' not in st.session_state:
+        st.session_state.show_creator_analysis = False
+    
+    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
+    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     with tab1:
-        # 1. 首先确保模板初始化 - 放在最前面
-        if 'templates' not in st.session_state:
-            logger.info("初始化默认模板到 session_state")
-            prompt_templates = PromptTemplates()
-            st.session_state.templates = prompt_templates.default_templates.copy()
-        
-        # 2. 处理成绩单上传和分析
+        # 添加成绩单上传功能
         transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
-        
-        if transcript_file is not None:
-            st.session_state.transcript_file = transcript_file.read()
-            st.success("成绩单上传成功！")
-            
-            if st.button("处理成绩单", key="process_transcript"):
-                try:
-                    logger.info("开始处理成绩单")
-                    logger.info(f"当前模板状态: {'templates' in st.session_state}")
-                    if 'templates' in st.session_state:
-                        logger.info(f"模板内容: {st.session_state.templates.keys()}")
-                    
-                    # 创建分析器实例
-                    transcript_analyzer = TranscriptAnalyzer(
-                        api_key=st.secrets["OPENROUTER_API_KEY"],
-                        prompt_templates=st.session_state.templates
-                    )
-                    
-                    with st.spinner("正在分析成绩单..."):
-                        # 处理成绩单分析
-                        result = transcript_analyzer.analyze_transcript(
-                            pdf_bytes=st.session_state.transcript_file
-                        )
-                        
-                        if result["status"] == "success":
-                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
-                            st.session_state.transcript_analysis_done = True
-                            st.success("✅ 成绩单分析完成！")
-                        else:
-                            st.error(f"成绩单分析出错: {result['message']}")
-                
-                except Exception as e:
-                    logger.error(f"成绩单分析错误: {str(e)}")
-                    st.error(f"处理过程中出错: {str(e)}")
         
         # 添加文件上传功能
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])
@@ -729,6 +733,17 @@ def main():
             height=100,
             help="请输入特殊的定制需求，如果没有可以保持默认值"
         )
+        
+        # 处理上传的成绩单
+        if transcript_file is not None:
+            st.session_state.transcript_file = transcript_file.read()
+            st.success("成绩单上传成功！")
+            
+            # 添加处理成绩单按钮
+            if st.button("处理成绩单", key="process_transcript"):
+                st.session_state.show_transcript_analysis = True
+                st.session_state.transcript_analysis_done = False
+                st.rerun()
         
         # 处理上传的文件
         if uploaded_file is not None:
@@ -781,21 +796,26 @@ def main():
                 
                 if not st.session_state.transcript_analysis_done:
                     try:
-                        # 处理成绩单分析
-                        result = TranscriptAnalyzer(
+                        # 确保正确传递 prompt_templates 对象
+                        transcript_analyzer = TranscriptAnalyzer(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.templates
-                        ).analyze_transcript(
-                            st.session_state.transcript_file
+                            prompt_templates=st.session_state.prompt_templates
                         )
                         
-                        if result["status"] == "success":
-                            # 保存成绩单分析结果到 session_state
-                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
-                            st.session_state.transcript_analysis_done = True
-                            st.success("✅ 成绩单分析完成！")
-                        else:
-                            st.error(f"成绩单分析出错: {result['message']}")
+                        with st.spinner("正在分析成绩单..."):
+                            # 处理成绩单分析
+                            result = transcript_analyzer.analyze_transcript(
+                                st.session_state.transcript_file, 
+                                school_plan
+                            )
+                            
+                            if result["status"] == "success":
+                                # 保存成绩单分析结果到 session_state
+                                st.session_state.transcript_analysis_result = result["transcript_analysis"]
+                                st.session_state.transcript_analysis_done = True
+                                st.success("✅ 成绩单分析完成！")
+                            else:
+                                st.error(f"成绩单分析出错: {result['message']}")
                     
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
@@ -814,14 +834,20 @@ def main():
                     try:
                         agent = BrainstormingAgent(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.templates
+                            prompt_templates=st.session_state.prompt_templates
                         )
                         
                         with st.spinner("正在进行背景分析..."):
+                            # 获取成绩单分析结果（如果有）
+                            transcript_analysis = ""
+                            if st.session_state.transcript_analysis_done:
+                                transcript_analysis = st.session_state.transcript_analysis_result
+                            
                             # 处理第一阶段分析
                             result = agent.process_strategist(
                                 st.session_state.document_content, 
-                                school_plan
+                                school_plan,
+                                transcript_analysis
                             )
                             
                             if result["status"] == "success":
@@ -850,7 +876,7 @@ def main():
                     try:
                         agent = BrainstormingAgent(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.templates
+                            prompt_templates=st.session_state.prompt_templates
                         )
                         
                         with st.spinner("正在进行内容规划..."):
@@ -874,34 +900,31 @@ def main():
                     # 如果已经完成，直接显示结果
                     st.markdown(st.session_state.creator_analysis_result)
                     st.success("✅ 内容规划完成！")
-
+    
     with tab2:
         st.title("提示词设置")
         
-        # 确保 prompt_templates 存在
-        if 'templates' not in st.session_state:
-            prompt_templates = PromptTemplates()
-            st.session_state.templates = prompt_templates.default_templates.copy()
+        prompt_templates = st.session_state.prompt_templates
         
         # 成绩单分析设置
         st.subheader("成绩单分析")
         transcript_role = st.text_area(
             "角色设定",
-            value=st.session_state.templates.get('transcript_role', ""),
+            value=prompt_templates.get_template('transcript_role'),
             height=200,
             key="transcript_role"
         )
         
         transcript_task = st.text_area(
             "任务说明",
-            value=st.session_state.templates.get('transcript_task', ""),
+            value=prompt_templates.get_template('transcript_task'),
             height=200,
             key="transcript_task"
         )
         
         transcript_output = st.text_area(
             "输出格式",
-            value=st.session_state.templates.get('transcript_output', ""),
+            value=prompt_templates.get_template('transcript_output'),
             height=200,
             key="transcript_output"
         )
@@ -910,44 +933,43 @@ def main():
         st.subheader("Agent 1 - 档案策略师")
         consultant_role1 = st.text_area(
             "角色设定",
-            value=st.session_state.templates.get('consultant_role1', ""),
+            value=prompt_templates.get_template('consultant_role1'),
             height=200,
             key="consultant_role1"
         )
         
         consultant_task1 = st.text_area(
             "任务说明",
-            value=st.session_state.templates.get('consultant_task1', ""),
+            value=prompt_templates.get_template('consultant_task1'),
             height=200,
             key="consultant_task1"
         )
 
         output_format1 = st.text_area(
             "输出格式",
-            value=st.session_state.templates.get('output_format1', ""),
+            value=prompt_templates.get_template('output_format1'),
             height=200,
             key="output_format1"
         )
-        
         # Agent 2 设置
         st.subheader("Agent 2 - 内容创作师")
         consultant_role2 = st.text_area(
             "角色设定",
-            value=st.session_state.templates.get('consultant_role2', ""),
+            value=prompt_templates.get_template('consultant_role2'),
             height=200,
             key="consultant_role2"
         )
 
         consultant_task2 = st.text_area(
             "任务说明",
-            value=st.session_state.templates.get('consultant_task2', ""),
+            value=prompt_templates.get_template('consultant_task2'),
             height=200,
             key="consultant_task2"
         )
 
         output_format2 = st.text_area(
             "输出格式",
-            value=st.session_state.templates.get('output_format2', ""),
+            value=prompt_templates.get_template('output_format2'),
             height=200,
             key="output_format2"
         )
@@ -955,75 +977,21 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
-                st.session_state.templates.update({
-                    'transcript_role': transcript_role,
-                    'transcript_task': transcript_task,
-                    'transcript_output': transcript_output,
-                    'consultant_role1': consultant_role1,
-                    'output_format1': output_format1,
-                    'consultant_task1': consultant_task1,
-                    'consultant_role2': consultant_role2,
-                    'output_format2': output_format2,
-                    'consultant_task2': consultant_task2
-                })
+                prompt_templates.update_template('transcript_role', transcript_role)
+                prompt_templates.update_template('transcript_task', transcript_task)
+                prompt_templates.update_template('transcript_output', transcript_output)
+                prompt_templates.update_template('consultant_role1', consultant_role1)
+                prompt_templates.update_template('output_format1', output_format1)
+                prompt_templates.update_template('consultant_task1', consultant_task1)
+                prompt_templates.update_template('consultant_role2', consultant_role2)
+                prompt_templates.update_template('output_format2', output_format2)
+                prompt_templates.update_template('consultant_task2', consultant_task2)
                 st.success("✅ 提示词已更新！")
         
         with col2:
             if st.button("重置为默认提示词", key="reset_prompts"):
-                prompt_templates = PromptTemplates()
-                st.session_state.templates = prompt_templates.default_templates.copy()
+                prompt_templates.reset_to_default()
                 st.rerun()
-
-def token_generator(queue: Queue):
-    """生成器函数，用于流式输出"""
-    while True:
-        try:
-            token = queue.get(block=False)
-            yield token
-        except Empty:
-            break
-        time.sleep(0.01)
-
-def convert_pdf_to_images(pdf_bytes: bytes) -> List[str]:
-    """
-    将 PDF 文件转换为 base64 编码的图像列表
-    
-    Args:
-        pdf_bytes (bytes): PDF 文件的字节内容
-    
-    Returns:
-        List[str]: base64 编码的图像列表
-    """
-    try:
-        # 创建一个 BytesIO 对象来读取 PDF
-        pdf_stream = io.BytesIO(pdf_bytes)
-        
-        # 打开 PDF 文件
-        pdf_document = fitz.open(stream=pdf_stream, filetype="pdf")
-        
-        images = []
-        for page_num in range(len(pdf_document)):
-            # 获取页面
-            page = pdf_document[page_num]
-            
-            # 将页面渲染为图像
-            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x缩放以提高清晰度
-            
-            # 将 Pixmap 直接转换为 PNG 格式的字节
-            img_bytes = pix.tobytes("png")
-            
-            # 将图像转换为 base64
-            base64_image = base64.b64encode(img_bytes).decode()
-            images.append(base64_image)
-        
-        # 关闭 PDF 文档
-        pdf_document.close()
-        
-        return images
-        
-    except Exception as e:
-        logger.error(f"PDF 转换错误: {str(e)}")
-        raise e
 
 if __name__ == "__main__":
     main()
