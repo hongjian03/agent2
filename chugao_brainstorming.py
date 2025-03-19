@@ -122,6 +122,7 @@ class PromptTemplates:
             st.session_state.templates = self.default_templates.copy()
 
     def get_template(self, template_name: str) -> str:
+        # 确保从 st.session_state.templates 获取模板
         return st.session_state.templates.get(template_name, "")
 
     def update_template(self, template_name: str, new_content: str) -> None:
@@ -789,9 +790,10 @@ def main():
                 
                 if not st.session_state.transcript_analysis_done:
                     try:
+                        # 确保正确传递 prompt_templates 对象
                         transcript_analyzer = TranscriptAnalyzer(
-                            api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
-                            prompt_templates=st.session_state.prompt_templates
+                            api_key=st.secrets["OPENROUTER_API_KEY"],
+                            prompt_templates=st.session_state.prompt_templates  # 确保这里使用正确的对象
                         )
                         
                         with st.spinner("正在分析成绩单..."):
