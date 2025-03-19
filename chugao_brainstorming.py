@@ -717,7 +717,6 @@ def main():
                         # 确保传递 school_plan 参数
                         result = transcript_analyzer.analyze_transcript(
                             pdf_bytes=st.session_state.transcript_file,
-                            school_plan=school_plan  # 确保传递这个参数
                         )
                         
                         if result["status"] == "success":
