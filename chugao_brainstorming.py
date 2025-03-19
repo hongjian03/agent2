@@ -162,7 +162,7 @@ class TranscriptAnalyzer:
             logger.error(f"提取PDF图像时出错: {str(e)}")
             return []
     
-    def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
+    def analyze_transcript(self, pdf_bytes) :
         try:
             # 提取PDF中的图像
             images = self.extract_images_from_pdf(pdf_bytes)
@@ -172,6 +172,18 @@ class TranscriptAnalyzer:
                     "status": "error",
                     "message": "无法从PDF中提取图像，请检查文件格式。"
                 }
+            
+            # 创建一个队列用于流式输出
+            message_queue = Queue()
+            
+            # 创建自定义回调处理器
+            class QueueCallbackHandler(BaseCallbackHandler):
+                def __init__(self, queue):
+                    self.queue = queue
+                    super().__init__()
+                
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
+                    self.queue.put(token)
             
             # 构建系统消息内容
             system_content = (
@@ -183,10 +195,10 @@ class TranscriptAnalyzer:
             # 创建消息列表
             messages = [
                 SystemMessage(content=system_content),
-                HumanMessage(content=f"选校方案：\n{school_plan}")
+                
             ]
             
-            # 添加图像到用户消息
+            # 处理 PDF 并添加图像
             user_content = []
             for i, img_base64 in enumerate(images):
                 user_content.append({
@@ -201,29 +213,20 @@ class TranscriptAnalyzer:
             if user_content:
                 messages.append(HumanMessage(content=user_content))
             
-            # 创建一个队列用于流式输出
-            message_queue = Queue()
-            
-            # 创建自定义回调处理器
-            class QueueCallbackHandler(BaseCallbackHandler):
-                def __init__(self, queue):
-                    self.queue = queue
-                    super().__init__()
-                
-                def on_llm_new_token(self, token: str, **kwargs) -> None:
-                    self.queue.put(token)
-            
-            # 调用LLM进行分析
+            # 调用LLM进行分析，只传递一次 callbacks
             result = self.llm.invoke(
                 messages,
                 callbacks=[QueueCallbackHandler(message_queue)]
             )
             
-            message_queue.put("\n\n成绩单分析完成！")
+            # 使用 st.write_stream 显示流式输出
+            output_container = st.empty()
+            with output_container:
+                full_response = st.write_stream(token_generator(message_queue))
             
             return {
                 "status": "success",
-                "transcript_analysis": result.content
+                "transcript_analysis": full_response
             }
                 
         except Exception as e:
@@ -704,21 +707,17 @@ def main():
                     if 'templates' in st.session_state:
                         logger.info(f"模板内容: {st.session_state.templates.keys()}")
                     
-                    # 确保在处理之前再次检查模板
-                    if 'templates' not in st.session_state:
-                        logger.warning("模板丢失，重新初始化")
-                        prompt_templates = PromptTemplates()
-                        st.session_state.templates = prompt_templates.default_templates.copy()
-                    
-                    # 创建分析器实例，直接传入模板字典
+                    # 创建分析器实例
                     transcript_analyzer = TranscriptAnalyzer(
                         api_key=st.secrets["OPENROUTER_API_KEY"],
                         prompt_templates=st.session_state.templates
                     )
                     
                     with st.spinner("正在分析成绩单..."):
+                        # 确保传递 school_plan 参数
                         result = transcript_analyzer.analyze_transcript(
-                            st.session_state.transcript_file,
+                            pdf_bytes=st.session_state.transcript_file,
+                            school_plan=school_plan  # 确保传递这个参数
                         )
                         
                         if result["status"] == "success":
@@ -1005,6 +1004,16 @@ def main():
                 prompt_templates = PromptTemplates()
                 st.session_state.templates = prompt_templates.default_templates.copy()
                 st.rerun()
+
+def token_generator(queue: Queue):
+    """生成器函数，用于流式输出"""
+    while True:
+        try:
+            token = queue.get(block=False)
+            yield token
+        except Empty:
+            break
+        time.sleep(0.01)
 
 if __name__ == "__main__":
     main()
