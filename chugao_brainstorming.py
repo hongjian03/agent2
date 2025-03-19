@@ -681,46 +681,58 @@ def main():
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
-    # 初始化 prompt_templates 对象
-    if 'templates' not in st.session_state:
-        prompt_templates = PromptTemplates()
-        st.session_state.templates = prompt_templates.default_templates.copy()
-    
-    # 确保在使用前初始化 prompt_templates 到 session_state
-    if 'prompt_templates' not in st.session_state:
-        st.session_state.prompt_templates = PromptTemplates()
-    
-    # 初始化其他 session state 变量
-    if 'document_content' not in st.session_state:
-        st.session_state.document_content = None
-    if 'transcript_file' not in st.session_state:
-        st.session_state.transcript_file = None
-    if 'transcript_analysis_done' not in st.session_state:
-        st.session_state.transcript_analysis_done = False
-    if 'transcript_analysis_result' not in st.session_state:
-        st.session_state.transcript_analysis_result = None
-    if 'strategist_analysis_done' not in st.session_state:
-        st.session_state.strategist_analysis_done = False
-    if 'strategist_analysis_result' not in st.session_state:
-        st.session_state.strategist_analysis_result = None
-    if 'creator_analysis_done' not in st.session_state:
-        st.session_state.creator_analysis_done = False
-    if 'creator_analysis_result' not in st.session_state:
-        st.session_state.creator_analysis_result = None
-    if 'show_transcript_analysis' not in st.session_state:
-        st.session_state.show_transcript_analysis = False
-    if 'show_strategist_analysis' not in st.session_state:
-        st.session_state.show_strategist_analysis = False
-    if 'show_creator_analysis' not in st.session_state:
-        st.session_state.show_creator_analysis = False
-    
-    tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
-    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
+    # 创建标签页
+    tab1, tab2 = st.tabs(["主页面", "提示词设置"])
     
     with tab1:
-        # 添加成绩单上传功能
+        # 1. 首先确保模板初始化 - 放在最前面
+        if 'templates' not in st.session_state:
+            logger.info("初始化默认模板到 session_state")
+            prompt_templates = PromptTemplates()
+            st.session_state.templates = prompt_templates.default_templates.copy()
+        
+        # 2. 处理成绩单上传和分析
         transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+        
+        if transcript_file is not None:
+            st.session_state.transcript_file = transcript_file.read()
+            st.success("成绩单上传成功！")
+            
+            if st.button("处理成绩单", key="process_transcript"):
+                try:
+                    logger.info("开始处理成绩单")
+                    logger.info(f"当前模板状态: {'templates' in st.session_state}")
+                    if 'templates' in st.session_state:
+                        logger.info(f"模板内容: {st.session_state.templates.keys()}")
+                    
+                    # 确保在处理之前再次检查模板
+                    if 'templates' not in st.session_state:
+                        logger.warning("模板丢失，重新初始化")
+                        prompt_templates = PromptTemplates()
+                        st.session_state.templates = prompt_templates.default_templates.copy()
+                    
+                    # 创建分析器实例，传入当前的 session_state
+                    transcript_analyzer = TranscriptAnalyzer(
+                        api_key=st.secrets["OPENROUTER_API_KEY"],
+                        prompt_templates=PromptTemplates()  # 这里创建新实例，它会使用 session_state 中的模板
+                    )
+                    
+                    with st.spinner("正在分析成绩单..."):
+                        result = transcript_analyzer.analyze_transcript(
+                            st.session_state.transcript_file,
+                            school_plan
+                        )
+                        
+                        if result["status"] == "success":
+                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
+                            st.session_state.transcript_analysis_done = True
+                            st.success("✅ 成绩单分析完成！")
+                        else:
+                            st.error(f"成绩单分析出错: {result['message']}")
+                
+                except Exception as e:
+                    logger.error(f"成绩单分析错误: {str(e)}")
+                    st.error(f"处理过程中出错: {str(e)}")
         
         # 添加文件上传功能
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])
@@ -740,22 +752,6 @@ def main():
             height=100,
             help="请输入特殊的定制需求，如果没有可以保持默认值"
         )
-        
-        # 处理上传的成绩单
-        if transcript_file is not None:
-            st.session_state.transcript_file = transcript_file.read()
-            st.success("成绩单上传成功！")
-            
-            # 添加处理成绩单按钮
-            if st.button("处理成绩单", key="process_transcript"):
-                # 确保模板已初始化
-                if 'templates' not in st.session_state:
-                    prompt_templates = PromptTemplates()
-                    st.session_state.templates = prompt_templates.default_templates.copy()
-                
-                st.session_state.show_transcript_analysis = True
-                st.session_state.transcript_analysis_done = False
-                st.rerun()
         
         # 处理上传的文件
         if uploaded_file is not None:
@@ -811,7 +807,7 @@ def main():
                         # 确保正确传递 prompt_templates 对象
                         transcript_analyzer = TranscriptAnalyzer(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates
+                            prompt_templates=st.session_state.templates
                         )
                         
                         with st.spinner("正在分析成绩单..."):
@@ -846,7 +842,7 @@ def main():
                     try:
                         agent = BrainstormingAgent(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates
+                            prompt_templates=st.session_state.templates
                         )
                         
                         with st.spinner("正在进行背景分析..."):
@@ -888,7 +884,7 @@ def main():
                     try:
                         agent = BrainstormingAgent(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates
+                            prompt_templates=st.session_state.templates
                         )
                         
                         with st.spinner("正在进行内容规划..."):
@@ -912,31 +908,34 @@ def main():
                     # 如果已经完成，直接显示结果
                     st.markdown(st.session_state.creator_analysis_result)
                     st.success("✅ 内容规划完成！")
-    
+
     with tab2:
         st.title("提示词设置")
         
-        prompt_templates = st.session_state.prompt_templates
+        # 确保 prompt_templates 存在
+        if 'templates' not in st.session_state:
+            prompt_templates = PromptTemplates()
+            st.session_state.templates = prompt_templates.default_templates.copy()
         
         # 成绩单分析设置
         st.subheader("成绩单分析")
         transcript_role = st.text_area(
             "角色设定",
-            value=prompt_templates.get_template('transcript_role'),
+            value=st.session_state.templates.get('transcript_role', ""),
             height=200,
             key="transcript_role"
         )
         
         transcript_task = st.text_area(
             "任务说明",
-            value=prompt_templates.get_template('transcript_task'),
+            value=st.session_state.templates.get('transcript_task', ""),
             height=200,
             key="transcript_task"
         )
         
         transcript_output = st.text_area(
             "输出格式",
-            value=prompt_templates.get_template('transcript_output'),
+            value=st.session_state.templates.get('transcript_output', ""),
             height=200,
             key="transcript_output"
         )
@@ -945,43 +944,44 @@ def main():
         st.subheader("Agent 1 - 档案策略师")
         consultant_role1 = st.text_area(
             "角色设定",
-            value=prompt_templates.get_template('consultant_role1'),
+            value=st.session_state.templates.get('consultant_role1', ""),
             height=200,
             key="consultant_role1"
         )
         
         consultant_task1 = st.text_area(
             "任务说明",
-            value=prompt_templates.get_template('consultant_task1'),
+            value=st.session_state.templates.get('consultant_task1', ""),
             height=200,
             key="consultant_task1"
         )
 
         output_format1 = st.text_area(
             "输出格式",
-            value=prompt_templates.get_template('output_format1'),
+            value=st.session_state.templates.get('output_format1', ""),
             height=200,
             key="output_format1"
         )
+        
         # Agent 2 设置
         st.subheader("Agent 2 - 内容创作师")
         consultant_role2 = st.text_area(
             "角色设定",
-            value=prompt_templates.get_template('consultant_role2'),
+            value=st.session_state.templates.get('consultant_role2', ""),
             height=200,
             key="consultant_role2"
         )
 
         consultant_task2 = st.text_area(
             "任务说明",
-            value=prompt_templates.get_template('consultant_task2'),
+            value=st.session_state.templates.get('consultant_task2', ""),
             height=200,
             key="consultant_task2"
         )
 
         output_format2 = st.text_area(
             "输出格式",
-            value=prompt_templates.get_template('output_format2'),
+            value=st.session_state.templates.get('output_format2', ""),
             height=200,
             key="output_format2"
         )
@@ -989,20 +989,23 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
-                prompt_templates.update_template('transcript_role', transcript_role)
-                prompt_templates.update_template('transcript_task', transcript_task)
-                prompt_templates.update_template('transcript_output', transcript_output)
-                prompt_templates.update_template('consultant_role1', consultant_role1)
-                prompt_templates.update_template('output_format1', output_format1)
-                prompt_templates.update_template('consultant_task1', consultant_task1)
-                prompt_templates.update_template('consultant_role2', consultant_role2)
-                prompt_templates.update_template('output_format2', output_format2)
-                prompt_templates.update_template('consultant_task2', consultant_task2)
+                st.session_state.templates.update({
+                    'transcript_role': transcript_role,
+                    'transcript_task': transcript_task,
+                    'transcript_output': transcript_output,
+                    'consultant_role1': consultant_role1,
+                    'output_format1': output_format1,
+                    'consultant_task1': consultant_task1,
+                    'consultant_role2': consultant_role2,
+                    'output_format2': output_format2,
+                    'consultant_task2': consultant_task2
+                })
                 st.success("✅ 提示词已更新！")
         
         with col2:
             if st.button("重置为默认提示词", key="reset_prompts"):
-                prompt_templates.reset_to_default()
+                prompt_templates = PromptTemplates()
+                st.session_state.templates = prompt_templates.default_templates.copy()
                 st.rerun()
 
 if __name__ == "__main__":
