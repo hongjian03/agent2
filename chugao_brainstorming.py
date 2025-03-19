@@ -198,20 +198,21 @@ class TranscriptAnalyzer:
                         message_queue.put("无法从PDF中提取图像，请检查文件格式。")
                         return
                     
-                    # 构建提示词
-                    system_prompt = f"{self.prompt_templates.get_template('transcript_role')}\n\n" \
-                                   f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
-                                   f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
+                    # 使用 ChatPromptTemplate 构建提示词
+                    system_prompt = ChatPromptTemplate.from_messages([
+                        ("system", f"{self.prompt_templates.get_template('transcript_role')}\n\n"
+                                  f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n"
+                                  f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"),
+                        ("human", "")
+                    ])
                     
-                    # 准备消息列表，包含系统消息和用户消息
+                    # 准备消息列表
                     messages = [
                         SystemMessage(content=system_prompt),
                     ]
                     
                     # 添加用户消息，包含文本和图像
-                    user_content = [
-                        
-                    ]
+                    user_content = []
                     
                     # 添加图像到用户消息
                     for i, img_base64 in enumerate(images):
