@@ -203,30 +203,37 @@ class TranscriptAnalyzer:
                                    f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
                                    f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
                     
-                    # 将图像转换为文本描述
-                    image_descriptions = [f"[图像 {i+1}: 成绩单页面]" for i in range(len(images))]
-                    image_text = "\n".join(image_descriptions)
+                    # 准备消息列表，包含系统消息和用户消息
+                    messages = [
+                        SystemMessage(content=system_prompt),
+                    ]
                     
-                    user_prompt = f"选校方案：\n{school_plan}\n\n" \
-                                 f"请分析以下成绩单图像，提取关键信息并进行分析。\n\n" \
-                                 f"成绩单包含以下页面：\n{image_text}"
+                    # 添加用户消息，包含文本和图像
+                    user_content = [
+                        
+                    ]
                     
-                    # 创建提示模板
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", system_prompt),
-                        ("human", user_prompt)
-                    ])
+                    # 添加图像到用户消息
+                    for i, img_base64 in enumerate(images):
+                        user_content.append({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{img_base64}",
+                                "detail": "high"
+                            }
+                        })
+                    
+                    messages.append(HumanMessage(content=user_content))
                     
                     # 调用LLM进行分析
-                    chain = LLMChain(llm=self.llm, prompt=prompt)
-                    result = chain.run(
-                        {},
+                    result = self.llm.invoke(
+                        messages,
                         callbacks=[QueueCallbackHandler(message_queue)]
                     )
                     
                     message_queue.put("\n\n成绩单分析完成！")
-                    thread.result = result
-                    return result
+                    thread.result = result.content
+                    return result.content
                     
                 except Exception as e:
                     message_queue.put(f"\n\n错误: {str(e)}")
@@ -676,7 +683,8 @@ def main():
     # 确保在使用前初始化 prompt_templates
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
-        
+    if 'templates' not in st.session_state:
+        st.session_state.templates = PromptTemplates()
     # 初始化其他 session state 变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
