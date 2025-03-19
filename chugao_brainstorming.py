@@ -142,48 +142,13 @@ class TranscriptAnalyzer:
         )
         self.templates = prompt_templates
     
-    def extract_images_from_pdf(self, pdf_bytes):
-        """从PDF中提取图像"""
+    def analyze_transcript(self, pdf_bytes) -> Dict[str, Any]:
         try:
-            images = []
-            pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
-            
-            for page_num in range(len(pdf_document)):
-                page = pdf_document[page_num]
-                # 将页面直接转换为图像
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                img_bytes = pix.tobytes("png")
-                # 将图像编码为base64字符串
-                img_base64 = base64.b64encode(img_bytes).decode('utf-8')
-                images.append(img_base64)
-            
-            return images
-        except Exception as e:
-            logger.error(f"提取PDF图像时出错: {str(e)}")
-            return []
-    
-    def analyze_transcript(self, pdf_bytes) :
-        try:
-            # 提取PDF中的图像
-            images = self.extract_images_from_pdf(pdf_bytes)
-            
-            if not images:
-                return {
-                    "status": "error",
-                    "message": "无法从PDF中提取图像，请检查文件格式。"
-                }
-            
             # 创建一个队列用于流式输出
             message_queue = Queue()
             
             # 创建自定义回调处理器
-            class QueueCallbackHandler(BaseCallbackHandler):
-                def __init__(self, queue):
-                    self.queue = queue
-                    super().__init__()
-                
-                def on_llm_new_token(self, token: str, **kwargs) -> None:
-                    self.queue.put(token)
+            callback_handler = QueueCallbackHandler(message_queue)
             
             # 构建系统消息内容
             system_content = (
@@ -192,13 +157,13 @@ class TranscriptAnalyzer:
                 f"请按照以下格式输出:\n{self.templates['transcript_output']}"
             )
             
-            # 创建消息列表
+            # 创建消息列表，只包含系统消息
             messages = [
-                SystemMessage(content=system_content),
-                
+                SystemMessage(content=system_content)
             ]
             
             # 处理 PDF 并添加图像
+            images = convert_pdf_to_images(pdf_bytes)
             user_content = []
             for i, img_base64 in enumerate(images):
                 user_content.append({
@@ -213,11 +178,18 @@ class TranscriptAnalyzer:
             if user_content:
                 messages.append(HumanMessage(content=user_content))
             
-            # 调用LLM进行分析，只传递一次 callbacks
-            result = self.llm.invoke(
-                messages,
-                callbacks=[QueueCallbackHandler(message_queue)]
+            # 创建一个新的 ChatOpenAI 实例，专门用于这次调用
+            llm_with_callback = ChatOpenAI(
+                temperature=0.7,
+                model=st.secrets["TRANSCRIPT_MODEL"],
+                api_key=self.llm.api_key,
+                base_url="https://openrouter.ai/api/v1",
+                streaming=True,
+                callbacks=[callback_handler]
             )
+            
+            # 调用LLM进行分析
+            result = llm_with_callback.invoke(messages)
             
             # 使用 st.write_stream 显示流式输出
             output_container = st.empty()
@@ -235,6 +207,15 @@ class TranscriptAnalyzer:
                 "status": "error",
                 "message": str(e)
             }
+
+# 将 QueueCallbackHandler 移到类外部
+class QueueCallbackHandler(BaseCallbackHandler):
+    def __init__(self, queue):
+        self.queue = queue
+        super().__init__()
+    
+    def on_llm_new_token(self, token: str, **kwargs) -> None:
+        self.queue.put(token)
 
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
@@ -714,9 +695,9 @@ def main():
                     )
                     
                     with st.spinner("正在分析成绩单..."):
-                        # 确保传递 school_plan 参数
+                        # 处理成绩单分析
                         result = transcript_analyzer.analyze_transcript(
-                            pdf_bytes=st.session_state.transcript_file,
+                            pdf_bytes=st.session_state.transcript_file
                         )
                         
                         if result["status"] == "success":
@@ -800,26 +781,21 @@ def main():
                 
                 if not st.session_state.transcript_analysis_done:
                     try:
-                        # 确保正确传递 prompt_templates 对象
-                        transcript_analyzer = TranscriptAnalyzer(
+                        # 处理成绩单分析
+                        result = TranscriptAnalyzer(
                             api_key=st.secrets["OPENROUTER_API_KEY"],
                             prompt_templates=st.session_state.templates
+                        ).analyze_transcript(
+                            st.session_state.transcript_file
                         )
                         
-                        with st.spinner("正在分析成绩单..."):
-                            # 处理成绩单分析
-                            result = transcript_analyzer.analyze_transcript(
-                                st.session_state.transcript_file, 
-                                school_plan
-                            )
-                            
-                            if result["status"] == "success":
-                                # 保存成绩单分析结果到 session_state
-                                st.session_state.transcript_analysis_result = result["transcript_analysis"]
-                                st.session_state.transcript_analysis_done = True
-                                st.success("✅ 成绩单分析完成！")
-                            else:
-                                st.error(f"成绩单分析出错: {result['message']}")
+                        if result["status"] == "success":
+                            # 保存成绩单分析结果到 session_state
+                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
+                            st.session_state.transcript_analysis_done = True
+                            st.success("✅ 成绩单分析完成！")
+                        else:
+                            st.error(f"成绩单分析出错: {result['message']}")
                     
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
@@ -842,16 +818,10 @@ def main():
                         )
                         
                         with st.spinner("正在进行背景分析..."):
-                            # 获取成绩单分析结果（如果有）
-                            transcript_analysis = ""
-                            if st.session_state.transcript_analysis_done:
-                                transcript_analysis = st.session_state.transcript_analysis_result
-                            
                             # 处理第一阶段分析
                             result = agent.process_strategist(
                                 st.session_state.document_content, 
-                                school_plan,
-                                transcript_analysis
+                                school_plan
                             )
                             
                             if result["status"] == "success":
@@ -1013,6 +983,49 @@ def token_generator(queue: Queue):
         except Empty:
             break
         time.sleep(0.01)
+
+def convert_pdf_to_images(pdf_bytes: bytes) -> List[str]:
+    """
+    将 PDF 文件转换为 base64 编码的图像列表
+    
+    Args:
+        pdf_bytes (bytes): PDF 文件的字节内容
+    
+    Returns:
+        List[str]: base64 编码的图像列表
+    """
+    try:
+        # 创建一个 BytesIO 对象来读取 PDF
+        pdf_stream = io.BytesIO(pdf_bytes)
+        
+        # 打开 PDF 文件
+        pdf_document = fitz.open(stream=pdf_stream, filetype="pdf")
+        
+        images = []
+        for page_num in range(len(pdf_document)):
+            # 获取页面
+            page = pdf_document[page_num]
+            
+            # 将页面渲染为图像
+            pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x缩放以提高清晰度
+            
+            # 将图像转换为 PNG 格式
+            img_bytes = io.BytesIO()
+            pix.save(img_bytes, "png")
+            img_bytes.seek(0)
+            
+            # 将图像转换为 base64
+            base64_image = base64.b64encode(img_bytes.getvalue()).decode()
+            images.append(base64_image)
+        
+        # 关闭 PDF 文档
+        pdf_document.close()
+        
+        return images
+        
+    except Exception as e:
+        logger.error(f"PDF 转换错误: {str(e)}")
+        raise e
 
 if __name__ == "__main__":
     main()
