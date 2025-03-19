@@ -182,7 +182,7 @@ class TranscriptAnalyzer:
             llm_with_callback = ChatOpenAI(
                 temperature=0.7,
                 model=st.secrets["TRANSCRIPT_MODEL"],
-                api_key=self.llm.api_key,
+                api_key=st.secrets["OPENROUTER_API_KEY"],
                 base_url="https://openrouter.ai/api/v1",
                 streaming=True,
                 callbacks=[callback_handler]
