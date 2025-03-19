@@ -132,16 +132,16 @@ class PromptTemplates:
         st.session_state.templates = self.default_templates.copy()
 
 class TranscriptAnalyzer:
-    def __init__(self, api_key: str, prompt_templates: PromptTemplates):
-        # 使用OpenRouter API访问模型
+    def __init__(self, api_key: str, prompt_templates: Dict[str, str]):
         self.llm = ChatOpenAI(
             temperature=0.7,
-            model=st.secrets["TRANSCRIPT_MODEL"],  # 从secrets中获取模型名称
+            model=st.secrets["TRANSCRIPT_MODEL"],
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             streaming=True
         )
-        self.prompt_templates = prompt_templates
+        # 直接存储模板字典
+        self.templates = prompt_templates
     
     def extract_images_from_pdf(self, pdf_bytes):
         """从PDF中提取图像"""
@@ -200,9 +200,9 @@ class TranscriptAnalyzer:
                     
                     # 使用 ChatPromptTemplate 构建提示词
                     system_prompt = ChatPromptTemplate.from_messages([
-                        ("system", f"{self.prompt_templates.get_template('transcript_role')}\n\n"
-                                  f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n"
-                                  f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"),
+                        ("system", f"{self.templates['transcript_role']}\n\n"
+                                  f"任务:\n{self.templates['transcript_task']}\n\n"
+                                  f"请按照以下格式输出:\n{self.templates['transcript_output']}"),
                         ("human", "")
                     ])
                     
@@ -711,16 +711,15 @@ def main():
                         prompt_templates = PromptTemplates()
                         st.session_state.templates = prompt_templates.default_templates.copy()
                     
-                    # 创建分析器实例，传入当前的 session_state
+                    # 创建分析器实例，直接传入模板字典
                     transcript_analyzer = TranscriptAnalyzer(
                         api_key=st.secrets["OPENROUTER_API_KEY"],
-                        prompt_templates=PromptTemplates()  # 这里创建新实例，它会使用 session_state 中的模板
+                        prompt_templates=st.session_state.templates
                     )
                     
                     with st.spinner("正在分析成绩单..."):
                         result = transcript_analyzer.analyze_transcript(
                             st.session_state.transcript_file,
-                            school_plan
                         )
                         
                         if result["status"] == "success":
