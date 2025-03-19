@@ -1009,13 +1009,11 @@ def convert_pdf_to_images(pdf_bytes: bytes) -> List[str]:
             # 将页面渲染为图像
             pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))  # 2x缩放以提高清晰度
             
-            # 将图像转换为 PNG 格式
-            img_bytes = io.BytesIO()
-            pix.save(img_bytes, "png")
-            img_bytes.seek(0)
+            # 将 Pixmap 直接转换为 PNG 格式的字节
+            img_bytes = pix.tobytes("png")
             
             # 将图像转换为 base64
-            base64_image = base64.b64encode(img_bytes.getvalue()).decode()
+            base64_image = base64.b64encode(img_bytes).decode()
             images.append(base64_image)
         
         # 关闭 PDF 文档
