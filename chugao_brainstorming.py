@@ -881,11 +881,14 @@ def main():
         
         # 修改背景分析显示
         if len(st.session_state.documents) == 1:
-            # 单文档显示逻辑保持不变
+            # 单文档显示逻辑
             if st.session_state.show_strategist_analysis:
                 with results_container:
                     st.markdown("---")
                     st.subheader("📊 第一阶段：背景分析")
+                    
+                    # 获取唯一文档的名称
+                    doc_name = list(st.session_state.documents.keys())[0]  # 添加这行来获取文档名称
                     
                     if not st.session_state.strategist_analysis_done:
                         try:
