@@ -421,7 +421,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-            
+                
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
@@ -824,36 +824,37 @@ def main():
                     st.session_state.show_creator_analysis = True
                     st.session_state.creator_analysis_done = False
                     st.rerun()
-        else:
-            # 双文件模式 - 修改按钮逻辑
+        elif len(uploaded_files) == 2:  # 修改这里，明确处理两个文件的情况
+            # 双文件模式
             col1, col2 = st.columns(2)
-            for idx, doc_name in enumerate(st.session_state.documents.keys()):
+            
+            # 遍历上传的文件而不是 session_state.documents
+            for idx, file in enumerate(uploaded_files):
                 display_col = col1 if idx == 0 else col2
                 with display_col:
-                    st.markdown(f"### 文档 {idx + 1}: {doc_name}")
+                    st.markdown(f"### 文档 {idx + 1}: {file.name}")
                     button_col1, button_col2 = st.columns(2)
                     
                     # 初始化文档特定的session状态（如果不存在）
-                    if f"show_strategist_{doc_name}" not in st.session_state:
-                        st.session_state[f"show_strategist_{doc_name}"] = False
-                    if f"strategist_done_{doc_name}" not in st.session_state:
-                        st.session_state[f"strategist_done_{doc_name}"] = False
-                    if f"show_creator_{doc_name}" not in st.session_state:
-                        st.session_state[f"show_creator_{doc_name}"] = False
-                    if f"creator_done_{doc_name}" not in st.session_state:
-                        st.session_state[f"creator_done_{doc_name}"] = False
+                    if f"show_strategist_{file.name}" not in st.session_state:
+                        st.session_state[f"show_strategist_{file.name}"] = False
+                    if f"strategist_done_{file.name}" not in st.session_state:
+                        st.session_state[f"strategist_done_{file.name}"] = False
+                    if f"show_creator_{file.name}" not in st.session_state:
+                        st.session_state[f"show_creator_{file.name}"] = False
+                    if f"creator_done_{file.name}" not in st.session_state:
+                        st.session_state[f"creator_done_{file.name}"] = False
                     
                     with button_col1:
                         if st.button(f"开始分析文档{idx + 1}", key=f"start_analysis_{idx}", use_container_width=True):
-                            st.session_state[f"show_strategist_{doc_name}"] = True
-                            st.session_state[f"strategist_done_{doc_name}"] = False
+                            st.session_state[f"show_strategist_{file.name}"] = True
+                            st.session_state[f"strategist_done_{file.name}"] = False
                             st.rerun()
                     
                     with button_col2:
-                        # 移除禁用条件，让按钮始终可点击
                         if st.button(f"继续规划文档{idx + 1}", key=f"continue_to_creator_{idx}", use_container_width=True):
-                            st.session_state[f"show_creator_{doc_name}"] = True
-                            st.session_state[f"creator_done_{doc_name}"] = False
+                            st.session_state[f"show_creator_{file.name}"] = True
+                            st.session_state[f"creator_done_{file.name}"] = False
                             st.rerun()
         
         # 修改结果显示区域
