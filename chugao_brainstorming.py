@@ -1165,77 +1165,7 @@ def main():
                     else:
                         st.markdown(st.session_state.creator_results[doc_name])
                         st.success("✅ 内容规划完成！")
-        else:
-            # 双文档显示
-            col1, col2 = st.columns(2)
-            for idx, (doc_name, content) in enumerate(st.session_state.documents.items()):
-                display_col = col1 if idx == 0 else col2
-                with display_col:
-                    if st.session_state.get(f"show_strategist_{doc_name}", False):
-                        st.markdown("---")
-                        st.subheader(f"📊 文档 {idx + 1} 背景分析")
-                        
-                        if not st.session_state.get(f"strategist_done_{doc_name}", False):
-                            try:
-                                agent = BrainstormingAgent(
-                                    api_key=st.secrets["OPENROUTER_API_KEY"],
-                                    prompt_templates=st.session_state.prompt_templates
-                                )
-                                
-                                with st.spinner(f"正在分析 {doc_name}..."):
-                                    transcript_analysis = ""
-                                    if st.session_state.transcript_analysis_done:
-                                        transcript_analysis = st.session_state.transcript_analysis_result
-                                    
-                                    result = agent.process_strategist(
-                                        content,
-                                        school_plan,
-                                        transcript_analysis
-                                    )
-                                    
-                                    if result["status"] == "success":
-                                        st.session_state.strategist_results[doc_name] = result["strategist_analysis"]
-                                        st.session_state[f"strategist_done_{doc_name}"] = True
-                                        st.success(f"✅ {doc_name} 背景分析完成！")
-                                    else:
-                                        st.error(f"{doc_name} 背景分析出错: {result['message']}")
-                            except Exception as e:
-                                st.error(f"处理过程中出错: {str(e)}")
-                        else:
-                            st.markdown(st.session_state.strategist_results[doc_name])
-                            st.success("✅ 背景分析完成！")
-                    
-                    # 显示内容规划
-                    if st.session_state.get(f"show_creator_{doc_name}", False):
-                        st.markdown("---")
-                        st.subheader(f"📝 文档 {idx + 1} 内容规划")
-                        
-                        if not st.session_state.get(f"creator_done_{doc_name}", False):
-                            try:
-                                agent = BrainstormingAgent(
-                                    api_key=st.secrets["OPENROUTER_API_KEY"],
-                                    prompt_templates=st.session_state.prompt_templates
-                                )
-                                
-                                with st.spinner(f"正在规划 {doc_name} 内容..."):
-                                    creator_result = agent.process_creator(
-                                        st.session_state.strategist_results[doc_name],
-                                        school_plan,
-                                        st.session_state.transcript_analysis_result,
-                                        custom_requirements
-                                    )
-                                    
-                                    if creator_result["status"] == "success":
-                                        st.session_state.creator_results[doc_name] = creator_result["creator_output"]
-                                        st.session_state[f"creator_done_{doc_name}"] = True
-                                        st.success(f"✅ {doc_name} 内容规划完成！")
-                                    else:
-                                        st.error(f"{doc_name} 内容规划出错: {creator_result['message']}")
-                            except Exception as e:
-                                st.error(f"处理过程中出错: {str(e)}")
-                        else:
-                            st.markdown(st.session_state.creator_results[doc_name])
-                            st.success("✅ 内容规划完成！")
+        
     
     with tab2:
         st.title("提示词设置")
