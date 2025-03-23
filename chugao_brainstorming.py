@@ -175,84 +175,104 @@ class TranscriptAnalyzer:
             return []
     
     def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
-        images = self.extract_images_from_pdf(pdf_bytes)
-        
-        # 构建包含图像的消息
-        messages = [
-            SystemMessage(content=self.prompt_templates.get_template('transcript_role')),
-            HumanMessage(content={
-                "type": "image",
-                "image": images[0],  # base64编码的图像
-                "text": "\n\n请分析这份成绩单，将成绩信息以表格形式输出。"
-            })
-        ]
-        
         try:
-            # 创建一个队列用于流式输出
-            message_queue = Queue()
+            images = self.extract_images_from_pdf(pdf_bytes)
+            if not images:
+                return {
+                    "status": "error",
+                    "message": "无法从PDF中提取图像"
+                }
             
-            # 创建自定义回调处理器
-            class QueueCallbackHandler(BaseCallbackHandler):
-                def __init__(self, queue):
-                    self.queue = queue
-                    super().__init__()
+            # 修改消息格式
+            messages = [
+                SystemMessage(content=self.prompt_templates.get_template('transcript_role')),
+                HumanMessage(content=[  # 注意这里改成了列表
+                    {
+                        "type": "text",
+                        "text": f"\n\n请分析这份成绩单，提取成绩信息，并以表格形式输出成绩信息。"
+                    },
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{images[0]}"
+                        }
+                    }
+                ])
+            ]
+            
+            try:
+                # 创建一个队列用于流式输出
+                message_queue = Queue()
                 
-                def on_llm_new_token(self, token: str, **kwargs) -> None:
-                    self.queue.put(token)
-            
-            # 创建一个生成器函数，用于流式输出
-            def token_generator():
-                while True:
+                # 创建自定义回调处理器
+                class QueueCallbackHandler(BaseCallbackHandler):
+                    def __init__(self, queue):
+                        self.queue = queue
+                        super().__init__()
+                    
+                    def on_llm_new_token(self, token: str, **kwargs) -> None:
+                        self.queue.put(token)
+                
+                # 创建一个生成器函数，用于流式输出
+                def token_generator():
+                    while True:
+                        try:
+                            token = message_queue.get(block=False)
+                            yield token
+                        except Empty:
+                            if not thread.is_alive() and message_queue.empty():
+                                break
+                        time.sleep(0.01)
+                
+                # 在单独的线程中运行分析
+                def run_analysis():
                     try:
-                        token = message_queue.get(block=False)
-                        yield token
-                    except Empty:
-                        if not thread.is_alive() and message_queue.empty():
-                            break
-                    time.sleep(0.01)
-            
-            # 在单独的线程中运行分析
-            def run_analysis():
-                try:
-                    # 调用LLM进行分析
-                    chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_messages(messages))
-                    result = chain.run(
-                        {},
-                        callbacks=[QueueCallbackHandler(message_queue)]
-                    )
+                        # 调用LLM进行分析
+                        chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_messages(messages))
+                        result = chain.run(
+                            {},
+                            callbacks=[QueueCallbackHandler(message_queue)]
+                        )
+                        
+                        message_queue.put("\n\n成绩单分析完成！")
+                        thread.result = result
+                        return result
+                        
+                    except Exception as e:
+                        message_queue.put(f"\n\n错误: {str(e)}")
+                        logger.error(f"成绩单分析错误: {str(e)}")
+                        thread.exception = e
+                        raise e
+                
+                # 启动线程
+                thread = Thread(target=run_analysis)
+                thread.start()
+                
+                # 使用 st.write_stream 显示流式输出
+                output_container = st.empty()
+                with output_container:
+                    full_response = st.write_stream(token_generator())
+                
+                # 等待线程完成
+                thread.join()
+                
+                # 获取结果
+                if hasattr(thread, "exception") and thread.exception:
+                    raise thread.exception
+                
+                logger.info("成绩单分析完成")
+                
+                return {
+                    "status": "success",
+                    "transcript_analysis": full_response
+                }
                     
-                    message_queue.put("\n\n成绩单分析完成！")
-                    thread.result = result
-                    return result
-                    
-                except Exception as e:
-                    message_queue.put(f"\n\n错误: {str(e)}")
-                    logger.error(f"成绩单分析错误: {str(e)}")
-                    thread.exception = e
-                    raise e
-            
-            # 启动线程
-            thread = Thread(target=run_analysis)
-            thread.start()
-            
-            # 使用 st.write_stream 显示流式输出
-            output_container = st.empty()
-            with output_container:
-                full_response = st.write_stream(token_generator())
-            
-            # 等待线程完成
-            thread.join()
-            
-            # 获取结果
-            if hasattr(thread, "exception") and thread.exception:
-                raise thread.exception
-            
-            logger.info("成绩单分析完成")
-            
-            return {
-                "status": "success",
-                "transcript_analysis": full_response
-            }
+            except Exception as e:
+                logger.error(f"成绩单分析错误: {str(e)}")
+                return {
+                    "status": "error",
+                    "message": str(e)
+                }
                 
         except Exception as e:
             logger.error(f"成绩单分析错误: {str(e)}")
