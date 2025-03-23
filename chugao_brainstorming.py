@@ -53,7 +53,7 @@ class PromptTemplates:
         self.default_templates = {
             'transcript_role': """
             # 角色
-            你是专业的成绩单分析师，擅长从成绩单中提取关键信息并进行分析。
+            你是专业的成绩单分析师，擅长从成绩单中提取关键信息并以表格形式展示成绩。
             """,
             
             'transcript_task': """
@@ -175,6 +175,18 @@ class TranscriptAnalyzer:
             return []
     
     def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
+        images = self.extract_images_from_pdf(pdf_bytes)
+        
+        # 构建包含图像的消息
+        messages = [
+            SystemMessage(content=self.prompt_templates.get_template('transcript_role')),
+            HumanMessage(content={
+                "type": "image",
+                "image": images[0],  # base64编码的图像
+                "text": "\n\n请分析这份成绩单，将成绩信息以表格形式输出。"
+            })
+        ]
+        
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
@@ -202,34 +214,8 @@ class TranscriptAnalyzer:
             # 在单独的线程中运行分析
             def run_analysis():
                 try:
-                    # 提取PDF中的图像
-                    images = self.extract_images_from_pdf(pdf_bytes)
-                    
-                    if not images:
-                        message_queue.put("无法从PDF中提取图像，请检查文件格式。")
-                        return
-                    
-                    # 构建提示词
-                    system_prompt = f"{self.prompt_templates.get_template('transcript_role')}\n\n" \
-                                   f"任务:\n{self.prompt_templates.get_template('transcript_task')}\n\n" \
-                                   f"请按照以下格式输出:\n{self.prompt_templates.get_template('transcript_output')}"
-                    
-                    # 将图像转换为文本描述
-                    image_descriptions = [f"[图像 {i+1}: 成绩单页面]" for i in range(len(images))]
-                    image_text = "\n".join(image_descriptions)
-                    
-                    user_prompt = f"选校方案：\n{school_plan}\n\n" \
-                                 f"请分析以下成绩单图像，提取关键信息并进行分析。\n\n" \
-                                 f"成绩单包含以下页面：\n{image_text}"
-                    
-                    # 创建提示模板
-                    prompt = ChatPromptTemplate.from_messages([
-                        ("system", system_prompt),
-                        ("human", user_prompt)
-                    ])
-                    
                     # 调用LLM进行分析
-                    chain = LLMChain(llm=self.llm, prompt=prompt)
+                    chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_messages(messages))
                     result = chain.run(
                         {},
                         callbacks=[QueueCallbackHandler(message_queue)]
@@ -274,6 +260,7 @@ class TranscriptAnalyzer:
                 "status": "error",
                 "message": str(e)
             }
+
 
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
@@ -683,13 +670,6 @@ def main():
     st.set_page_config(page_title="初稿脑暴助理平台", layout="wide")
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
-    
-    # 添加调试信息
-    st.write("Session state contents:", st.session_state)
-    if 'templates' in st.session_state:
-        st.write("Templates found:", st.session_state.templates)
-    else:
-        st.write("Templates not found in session state")
     
     # 确保在任何操作之前初始化 PromptTemplates
     if 'templates' not in st.session_state:
