@@ -482,144 +482,205 @@ class BrainstormingAgent:
 def add_custom_css():
     st.markdown("""
     <style>
+    /* 整体页面样式 */
+    .main {
+        padding: 2rem;
+    }
+    
     /* 标题样式 */
     h1, h2, h3 {
         color: #1e3a8a;
         font-weight: 600;
+        margin-bottom: 1.5rem;
     }
     
-    /* 卡片样式 */
-    .stTabs [data-baseweb="tab-panel"] {
-        background-color: white;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-        margin-top: 10px;
-    }
-    
-    /* 按钮样式 */
-    .stButton>button {
-        background-color: #1e3a8a;
-        color: white;
-        border-radius: 5px;
-        padding: 10px 20px;
-        font-weight: 500;
-        border: none;
-        width: 100%;
-    }
-    
-    .stButton>button:hover {
-        background-color: #2e4a9a;
-    }
-    
-    /* 输入框样式 */
-    .stTextInput>div>div>input, .stTextArea>div>div>textarea {
-        border-radius: 5px;
-        border: 1px solid #ddd;
+    .page-title {
+        text-align: center;
+        font-size: 2.5rem;
+        margin-bottom: 2rem;
+        color: #1e3a8a;
+        font-weight: bold;
+        padding: 1rem;
+        border-bottom: 3px solid #e5e7eb;
     }
     
     /* 文件上传区域样式 */
-    .stFileUploader>div>button {
-        background-color: #f1f3f9;
+    .stFileUploader {
+        margin-bottom: 2rem;
+    }
+    
+    .stFileUploader > div > button {
+        background-color: #f8fafc;
         color: #1e3a8a;
-        border: 1px dashed #1e3a8a;
-        border-radius: 5px;
+        border: 2px dashed #1e3a8a;
+        border-radius: 8px;
+        padding: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stFileUploader > div > button:hover {
+        background-color: #f0f7ff;
+        border-color: #2563eb;
+    }
+    
+    /* 按钮样式 */
+    .stButton > button {
+        background-color: #1e3a8a;
+        color: white;
+        border-radius: 8px;
+        padding: 0.75rem 1.5rem;
+        font-weight: 500;
+        border: none;
+        width: 100%;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .stButton > button:hover {
+        background-color: #2563eb;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    
+    .stButton > button:disabled {
+        background-color: #94a3b8;
+        cursor: not-allowed;
+    }
+    
+    /* 文本区域样式 */
+    .stTextArea > div > div > textarea {
+        border-radius: 8px;
+        border: 1px solid #e2e8f0;
+        padding: 0.75rem;
+        font-size: 1rem;
+        transition: all 0.3s ease;
+    }
+    
+    .stTextArea > div > div > textarea:focus {
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37,99,235,0.1);
+    }
+    
+    /* 分析结果区域样式 */
+    .analysis-container {
+        background-color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        border: 1px solid #e5e7eb;
     }
     
     /* 成功消息样式 */
     .stSuccess {
-        background-color: #d1fae5;
+        background-color: #ecfdf5;
         color: #065f46;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
-    /* 警告消息样式 */
-    .stWarning {
-        background-color: #fef3c7;
-        color: #92400e;
-        padding: 10px;
-        border-radius: 5px;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #059669;
+        margin: 1rem 0;
     }
     
     /* 错误消息样式 */
     .stError {
-        background-color: #fee2e2;
-        color: #b91c1c;
-        padding: 10px;
-        border-radius: 5px;
-    }
-    
-    /* 下拉选择框样式 */
-    .stSelectbox>div>div {
-        border-radius: 5px;
-        border: 1px solid #ddd;
-    }
-    
-    /* 页面标题样式 */
-    .page-title {
-        text-align: center;
-        font-size: 2rem;
-        margin-bottom: 20px;
-        color: #1e3a8a;
-        font-weight: bold;
-    }
-    
-    /* 卡片容器样式 */
-    .card-container {
-        background-color: white;
-        border-radius: 10px;
-        padding: 20px;
-        box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
-        margin-bottom: 20px;
-        width: 100%;
-    }
-    
-    /* 分隔线样式 */
-    hr {
-        margin-top: 20px;
-        margin-bottom: 20px;
-        border: 0;
-        border-top: 1px solid #eee;
+        background-color: #fef2f2;
+        color: #991b1b;
+        padding: 1rem;
+        border-radius: 8px;
+        border-left: 4px solid #dc2626;
+        margin: 1rem 0;
     }
     
     /* 模型信息样式 */
     .model-info {
         background-color: #f0f7ff;
-        padding: 8px 12px;
-        border-radius: 5px;
-        margin-top: 10px;
-        margin-bottom: 15px;
+        padding: 0.75rem 1rem;
+        border-radius: 8px;
+        margin: 0.5rem 0;
         display: inline-block;
         font-size: 0.9rem;
+        border: 1px solid #bfdbfe;
     }
     
-    /* 表格样式优化 */
-    .dataframe {
-        width: 100%;
-        border-collapse: collapse;
+    /* 双列布局样式 */
+    .dual-column {
+        display: flex;
+        gap: 2rem;
+        margin: 1rem 0;
     }
     
-    .dataframe th {
-        background-color: #f1f3f9;
-        padding: 8px;
+    .column {
+        flex: 1;
+        background-color: #f8fafc;
+        padding: 1.5rem;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
     }
     
-    .dataframe td {
-        padding: 8px;
-        border-bottom: 1px solid #eee;
+    /* 分隔线样式 */
+    hr {
+        margin: 2rem 0;
+        border: 0;
+        height: 1px;
+        background: linear-gradient(to right, transparent, #e5e7eb, transparent);
     }
     
+    /* 标签页样式 */
+    .stTabs {
+        background-color: white;
+        border-radius: 12px;
+        padding: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
     
+    .stTab {
+        padding: 1rem;
+    }
+    
+    /* 展开器样式 */
+    .streamlit-expanderHeader {
+        background-color: #f8fafc;
+        border-radius: 8px;
+        padding: 0.75rem;
+        font-weight: 500;
+        color: #1e3a8a;
+        border: 1px solid #e5e7eb;
+    }
+    
+    .streamlit-expanderContent {
+        background-color: white;
+        border-radius: 0 0 8px 8px;
+        padding: 1rem;
+        border: 1px solid #e5e7eb;
+        border-top: none;
+    }
+    
+    /* 加载动画样式 */
+    .stSpinner > div {
+        border-color: #2563eb transparent transparent transparent;
+    }
+    
+    /* 文档分析区域样式 */
+    .doc-analysis-area {
+        background-color: #ffffff;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin: 1rem 0;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        border: 1px solid #e5e7eb;
+    }
+    
+    .doc-analysis-area h3 {
+        color: #1e3a8a;
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
     
     /* 调整列宽度 */
     .column-adjust {
-        padding: 0 5px !important;
-    }
-    
-    /* 强制展开器内容宽度 */
-    .streamlit-expanderContent {
-        width: 100% !important;
+        padding: 0 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
