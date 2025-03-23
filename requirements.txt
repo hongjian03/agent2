@@ -15,3 +15,4 @@ PyPDF2
 supabase
 transformers
 sentence-transformers
+faiss-cpu
