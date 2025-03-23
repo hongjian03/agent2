@@ -786,7 +786,7 @@ def main():
         )
         
         # 修改按钮区域
-        if len(st.session_state.documents) == 1:
+        if len(uploaded_files) == 1:
             # 单文件模式
             button_col1, button_col2 = st.columns(2)
             with button_col1:
@@ -880,7 +880,7 @@ def main():
                     st.success("✅ 成绩单分析完成！")
         
         # 修改背景分析显示
-        if len(st.session_state.documents) == 1:
+        if len(uploaded_files) == 1:
             # 单文档显示逻辑
             if st.session_state.show_strategist_analysis:
                 with results_container:
