@@ -141,10 +141,11 @@ class PromptTemplates:
 
 class TranscriptAnalyzer:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
-        # 添加安全检查
-        if not hasattr(st.session_state, 'templates'):
-            st.session_state.templates = prompt_templates.default_templates.copy()
-            
+        self.prompt_templates = prompt_templates
+        # 确保 templates 存在于 session_state 中
+        if 'templates' not in st.session_state:
+            st.session_state.templates = self.prompt_templates.default_templates.copy()
+        
         self.llm = ChatOpenAI(
             temperature=0.7,
             model=st.secrets["TRANSCRIPT_MODEL"],
@@ -152,7 +153,6 @@ class TranscriptAnalyzer:
             base_url="https://openrouter.ai/api/v1",
             streaming=True
         )
-        self.prompt_templates = prompt_templates
     
     def extract_images_from_pdf(self, pdf_bytes):
         """从PDF中提取图像"""
@@ -176,6 +176,10 @@ class TranscriptAnalyzer:
     
     def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
         try:
+            if not hasattr(self, 'prompt_templates'):
+                logger.error("prompt_templates not initialized")
+                raise ValueError("Prompt templates not initialized properly")
+            
             images = self.extract_images_from_pdf(pdf_bytes)
             if not images:
                 return {
@@ -682,7 +686,17 @@ def read_docx(file_bytes):
         logger.error(f"读取 Word 文档时出错: {str(e)}")
         return None
 
+def initialize_session_state():
+    if 'templates' not in st.session_state:
+        prompt_templates = PromptTemplates()
+        st.session_state.templates = prompt_templates.default_templates.copy()
+    
+    if 'prompt_templates' not in st.session_state:
+        st.session_state.prompt_templates = PromptTemplates()
+
 def main():
+    initialize_session_state()
+    
     langsmith_api_key = st.secrets["LANGCHAIN_API_KEY"]
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
     os.environ["LANGCHAIN_API_KEY"] = langsmith_api_key
@@ -811,32 +825,33 @@ def main():
                     st.session_state.creator_analysis_done = False
                     st.rerun()
         else:
-            # 双文件模式 - 为每个文件创建独立的控制按钮
+            # 双文件模式 - 修改按钮逻辑
             col1, col2 = st.columns(2)
             for idx, doc_name in enumerate(st.session_state.documents.keys()):
                 display_col = col1 if idx == 0 else col2
                 with display_col:
                     st.markdown(f"### 文档 {idx + 1}: {doc_name}")
                     button_col1, button_col2 = st.columns(2)
+                    
+                    # 初始化文档特定的session状态（如果不存在）
+                    if f"show_strategist_{doc_name}" not in st.session_state:
+                        st.session_state[f"show_strategist_{doc_name}"] = False
+                    if f"strategist_done_{doc_name}" not in st.session_state:
+                        st.session_state[f"strategist_done_{doc_name}"] = False
+                    if f"show_creator_{doc_name}" not in st.session_state:
+                        st.session_state[f"show_creator_{doc_name}"] = False
+                    if f"creator_done_{doc_name}" not in st.session_state:
+                        st.session_state[f"creator_done_{doc_name}"] = False
+                    
                     with button_col1:
                         if st.button(f"开始分析文档{idx + 1}", key=f"start_analysis_{idx}", use_container_width=True):
-                            if f"show_strategist_{doc_name}" not in st.session_state:
-                                st.session_state[f"show_strategist_{doc_name}"] = False
                             st.session_state[f"show_strategist_{doc_name}"] = True
                             st.session_state[f"strategist_done_{doc_name}"] = False
-                            st.session_state[f"creator_done_{doc_name}"] = False
-                            st.session_state[f"show_creator_{doc_name}"] = False
                             st.rerun()
                     
                     with button_col2:
-                        continue_button = st.button(
-                            f"继续规划文档{idx + 1}", 
-                            key=f"continue_to_creator_{idx}",
-                            disabled=not st.session_state.get(f"strategist_done_{doc_name}", False),
-                            use_container_width=True
-                        )
-                        
-                        if continue_button:
+                        # 移除禁用条件，让按钮始终可点击
+                        if st.button(f"继续规划文档{idx + 1}", key=f"continue_to_creator_{idx}", use_container_width=True):
                             st.session_state[f"show_creator_{doc_name}"] = True
                             st.session_state[f"creator_done_{doc_name}"] = False
                             st.rerun()
@@ -852,6 +867,10 @@ def main():
                 
                 if not st.session_state.transcript_analysis_done:
                     try:
+                        # 确保 prompt_templates 存在
+                        if 'prompt_templates' not in st.session_state:
+                            st.session_state.prompt_templates = PromptTemplates()
+                        
                         transcript_analyzer = TranscriptAnalyzer(
                             api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
                             prompt_templates=st.session_state.prompt_templates
