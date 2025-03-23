@@ -811,7 +811,33 @@ def main():
                 st.rerun()
         
         # 修改文件上传部分，支持多个文件
-        uploaded_files = st.file_uploader("上传初稿文档（可选择1-2个文件）", type=['docx'], accept_multiple_files=True)
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            uploaded_files = st.file_uploader("上传初稿文档（可选择1-2个文件）", type=['docx'], accept_multiple_files=True)
+        with col2:
+            # 添加清除分析结果按钮
+            if st.button("清除所有分析", key="clear_analysis", use_container_width=True):
+                # 清除所有分析相关的session状态
+                st.session_state.documents = {}
+                st.session_state.strategist_results = {}
+                st.session_state.creator_results = {}
+                st.session_state.strategist_analysis_done = False
+                st.session_state.creator_analysis_done = False
+                st.session_state.show_strategist_analysis = False
+                st.session_state.show_creator_analysis = False
+                
+                # 清除文档特定的状态
+                keys_to_remove = []
+                for key in st.session_state.keys():
+                    if key.startswith(("show_strategist_", "show_creator_", 
+                                     "strategist_done_", "creator_done_")):
+                        keys_to_remove.append(key)
+                
+                for key in keys_to_remove:
+                    del st.session_state[key]
+                
+                st.success("✅ 所有分析结果已清除！")
+                st.rerun()
         
         if len(uploaded_files) > 2:
             st.error("最多只能上传2个文件进行分析")
