@@ -12,3 +12,6 @@ langchain-core
 python-docx
 PyMuPDF
 PyPDF2
+supabase
+transformers
+sentence-transformers
