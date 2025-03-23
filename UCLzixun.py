@@ -12,6 +12,9 @@ from langchain.tools import Tool
 from langchain_community.document_loaders import DirectoryLoader, TextLoader
 from langchain.text_splitter import CharacterTextSplitter
 from langchain_openai import ChatOpenAI
+import pandas as pd
+from typing import List
+from langchain.docstore.document import Document
 
 # 初始化会话状态变量
 if 'prompt_template' not in st.session_state:
@@ -35,30 +38,82 @@ if 'prompt_template' not in st.session_state:
     回答须为中文，表达专业且友好。
     """
 
+def excel_to_documents(excel_path: str) -> List[Document]:
+    """将Excel数据转换为Document格式"""
+    try:
+        # 读取Excel文件
+        df = pd.read_excel(excel_path)
+        documents = []
+        
+        # 将每行数据转换为结构化文本
+        for _, row in df.iterrows():
+            # 假设Excel中有这些列：专业名称、GPA、语言成绩、录取结果等
+            content = f"""
+            专业: {row['专业名称']}
+            录取要求:
+            - GPA: {row['GPA']}
+            - 语言成绩: {row['语言成绩']}
+            录取结果: {row['录取结果']}
+            其他信息: {row.get('其他信息', '')}
+            """
+            
+            # 创建Document对象
+            doc = Document(
+                page_content=content,
+                metadata={
+                    "program": row['专业名称'],
+                    "year": row.get('年份', 'Unknown'),
+                    "source": "UCL历史录取数据"
+                }
+            )
+            documents.append(doc)
+            
+        return documents
+    except Exception as e:
+        raise Exception(f"Excel数据转换错误: {str(e)}")
+
 # 加载知识库
 @st.cache_resource
 def create_vector_db():
     try:
-        # 创建向量数据库，这里使用示例数据目录
-        data_dir = "./knowledge_base"
-        if not os.path.exists(data_dir):
-            os.makedirs(data_dir)
-            # 创建示例文件
-            with open(f"{data_dir}/sample_data.txt", "w") as f:
-                f.write("UCL Computer Science 专业往年录取平均分数：托福总分不低于92分，雅思不低于6.5分。GPA要求3.3/4.0以上。")
-                f.write("UCL Economics 专业往年录取要求学生有较强的数学背景，通常需要GPA 3.5以上，雅思不低于7.0。")
+        # 指定Excel文件路径
+        excel_path = "./knowledge_base/ucl_admissions.xlsx"
         
-        # 加载文档
-        loader = DirectoryLoader(data_dir, glob="**/*.txt", loader_cls=TextLoader)
-        documents = loader.load()
+        # 如果Excel文件不存在，创建示例数据
+        if not os.path.exists("./knowledge_base"):
+            os.makedirs("./knowledge_base")
         
-        # 分割文档
-        text_splitter = CharacterTextSplitter(chunk_size=1000, chunk_overlap=200)
+        if not os.path.exists(excel_path):
+            # 创建示例Excel数据
+            sample_data = {
+                '专业名称': ['Computer Science', 'Economics', 'Data Science'],
+                'GPA': ['3.3/4.0', '3.5/4.0', '3.4/4.0'],
+                '语言成绩': ['托福92/雅思6.5', '雅思7.0', '托福95/雅思6.5'],
+                '录取结果': ['Conditional Offer', 'Conditional Offer', 'Conditional Offer'],
+                '其他信息': ['需要较强编程背景', '需要较强数学背景', '需要数据分析经验']
+            }
+            df = pd.DataFrame(sample_data)
+            df.to_excel(excel_path, index=False)
+        
+        # 将Excel转换为documents
+        documents = excel_to_documents(excel_path)
+        
+        # 分割文档（如果需要的话）
+        text_splitter = CharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=200,
+            separator="\n"
+        )
         texts = text_splitter.split_documents(documents)
         
         # 创建向量数据库
-        embeddings = HuggingFaceEmbeddings(model_name="sentence-transformers/all-MiniLM-L6-v2")
-        vector_db = FAISS.from_documents(documents=texts, embedding=embeddings)
+        embeddings = HuggingFaceEmbeddings(
+            model_name="sentence-transformers/all-MiniLM-L6-v2"
+        )
+        vector_db = FAISS.from_documents(
+            documents=texts,
+            embedding=embeddings
+        )
         
         return vector_db
     except Exception as e:
@@ -67,28 +122,50 @@ def create_vector_db():
 
 # 创建搜索工具
 def create_search_tools(vector_db):
-    retriever = vector_db.as_retriever(search_kwargs={"k": 3})
+    retriever = vector_db.as_retriever(
+        search_kwargs={
+            "k": 3,
+            "search_type": "mmr",  # 使用最大边际相关性搜索
+            "fetch_k": 10  # 初始获取的文档数量
+        }
+    )
     
-    def search_admission_data(query):
+    def search_admission_data(query: str) -> str:
         """搜索历年录取数据"""
-        results = retriever.get_relevant_documents(f"录取数据: {query}")
-        return "\n".join([doc.page_content for doc in results])
+        try:
+            results = retriever.get_relevant_documents(f"录取数据: {query}")
+            formatted_results = []
+            
+            for doc in results:
+                formatted_results.append(doc.page_content.strip())
+            
+            return "\n\n".join(formatted_results)
+        except Exception as e:
+            return f"搜索过程中出现错误: {str(e)}"
     
-    def search_program_requirements(query):
+    def search_program_requirements(query: str) -> str:
         """查询专业录取要求"""
-        results = retriever.get_relevant_documents(f"录取要求: {query}")
-        return "\n".join([doc.page_content for doc in results])
+        try:
+            results = retriever.get_relevant_documents(f"录取要求: {query}")
+            formatted_results = []
+            
+            for doc in results:
+                formatted_results.append(doc.page_content.strip())
+            
+            return "\n\n".join(formatted_results)
+        except Exception as e:
+            return f"搜索过程中出现错误: {str(e)}"
     
     tools = [
         Tool(
             name="搜索历年录取数据",
             func=search_admission_data,
-            description="用于搜索UCL各专业历年录取的学生分数和背景信息"
+            description="用于搜索UCL各专业历年录取的学生分数和背景信息，输入专业名称或具体查询条件"
         ),
         Tool(
             name="查询专业录取要求",
             func=search_program_requirements,
-            description="用于查询UCL各专业的具体录取要求和标准"
+            description="用于查询UCL各专业的具体录取要求和标准，输入专业名称即可"
         )
     ]
     
