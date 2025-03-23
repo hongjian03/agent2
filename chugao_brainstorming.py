@@ -145,7 +145,7 @@ class TranscriptAnalyzer:
         # 确保 templates 存在于 session_state 中
         if 'templates' not in st.session_state:
             st.session_state.templates = self.prompt_templates.default_templates.copy()
-        
+            
         self.llm = ChatOpenAI(
             temperature=0.7,
             model=st.secrets["TRANSCRIPT_MODEL"],
@@ -204,79 +204,71 @@ class TranscriptAnalyzer:
                 ])
             ]
             
-            try:
-                # 创建一个队列用于流式输出
-                message_queue = Queue()
+            # 创建一个队列用于流式输出
+            message_queue = Queue()
+            
+            # 创建自定义回调处理器
+            class QueueCallbackHandler(BaseCallbackHandler):
+                def __init__(self, queue):
+                    self.queue = queue
+                    super().__init__()
                 
-                # 创建自定义回调处理器
-                class QueueCallbackHandler(BaseCallbackHandler):
-                    def __init__(self, queue):
-                        self.queue = queue
-                        super().__init__()
-                    
-                    def on_llm_new_token(self, token: str, **kwargs) -> None:
-                        self.queue.put(token)
-                
-                # 创建一个生成器函数，用于流式输出
-                def token_generator():
-                    while True:
-                        try:
-                            token = message_queue.get(block=False)
-                            yield token
-                        except Empty:
-                            if not thread.is_alive() and message_queue.empty():
-                                break
-                        time.sleep(0.01)
-                
-                # 在单独的线程中运行分析
-                def run_analysis():
+                def on_llm_new_token(self, token: str, **kwargs) -> None:
+                    self.queue.put(token)
+            
+            # 创建一个生成器函数，用于流式输出
+            def token_generator():
+                while True:
                     try:
-                        # 调用LLM进行分析
-                        chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_messages(messages))
-                        result = chain.run(
-                            {},
-                            callbacks=[QueueCallbackHandler(message_queue)]
-                        )
-                        
-                        message_queue.put("\n\n成绩单分析完成！")
-                        thread.result = result
-                        return result
-                        
-                    except Exception as e:
-                        message_queue.put(f"\n\n错误: {str(e)}")
-                        logger.error(f"成绩单分析错误: {str(e)}")
-                        thread.exception = e
-                        raise e
-                
-                # 启动线程
-                thread = Thread(target=run_analysis)
-                thread.start()
-                
-                # 使用 st.write_stream 显示流式输出
-                output_container = st.empty()
-                with output_container:
-                    full_response = st.write_stream(token_generator())
-                
-                # 等待线程完成
-                thread.join()
-                
-                # 获取结果
-                if hasattr(thread, "exception") and thread.exception:
-                    raise thread.exception
-                
-                logger.info("成绩单分析完成")
-                
-                return {
-                    "status": "success",
-                    "transcript_analysis": full_response
-                }
+                        token = message_queue.get(block=False)
+                        yield token
+                    except Empty:
+                        if not thread.is_alive() and message_queue.empty():
+                            break
+                    time.sleep(0.01)
+            
+            # 在单独的线程中运行分析
+            def run_analysis():
+                try:
+                    # 调用LLM进行分析
+                    chain = LLMChain(llm=self.llm, prompt=ChatPromptTemplate.from_messages(messages))
+                    result = chain.run(
+                        {},
+                        callbacks=[QueueCallbackHandler(message_queue)]
+                    )
                     
-            except Exception as e:
-                logger.error(f"成绩单分析错误: {str(e)}")
-                return {
-                    "status": "error",
-                    "message": str(e)
-                }
+                    message_queue.put("\n\n成绩单分析完成！")
+                    thread.result = result
+                    return result
+                    
+                except Exception as e:
+                    message_queue.put(f"\n\n错误: {str(e)}")
+                    logger.error(f"成绩单分析错误: {str(e)}")
+                    thread.exception = e
+                    raise e
+            
+            # 启动线程
+            thread = Thread(target=run_analysis)
+            thread.start()
+            
+            # 使用 st.write_stream 显示流式输出
+            output_container = st.empty()
+            with output_container:
+                full_response = st.write_stream(token_generator())
+            
+            # 等待线程完成
+            thread.join()
+            
+            # 获取结果
+            if hasattr(thread, "exception") and thread.exception:
+                raise thread.exception
+            
+            logger.info("成绩单分析完成")
+            
+            return {
+                "status": "success",
+                "transcript_analysis": full_response
+            }
                 
         except Exception as e:
             logger.error(f"成绩单分析错误: {str(e)}")
@@ -284,7 +276,7 @@ class TranscriptAnalyzer:
                 "status": "error",
                 "message": str(e)
             }
-
+                
 
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
@@ -421,7 +413,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-                
+            
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
@@ -805,13 +797,13 @@ def main():
             button_col1, button_col2 = st.columns(2)
             with button_col1:
                 if st.button("开始背景分析", key="start_analysis", use_container_width=True):
-                    if st.session_state.documents:
-                        st.session_state.show_strategist_analysis = True
-                        st.session_state.strategist_analysis_done = False
-                        st.session_state.creator_analysis_done = False
-                        st.session_state.show_creator_analysis = False
-                        st.rerun()
-            
+                        if st.session_state.documents:
+                            st.session_state.show_strategist_analysis = True
+                            st.session_state.strategist_analysis_done = False
+                            st.session_state.creator_analysis_done = False
+                            st.session_state.show_creator_analysis = False
+                            st.rerun()
+                
             with button_col2:
                 continue_button = st.button(
                     "继续内容规划", 
@@ -828,34 +820,171 @@ def main():
             # 双文件模式
             col1, col2 = st.columns(2)
             
-            # 遍历上传的文件而不是 session_state.documents
-            for idx, file in enumerate(uploaded_files):
-                display_col = col1 if idx == 0 else col2
-                with display_col:
-                    st.markdown(f"### 文档 {idx + 1}: {file.name}")
-                    button_col1, button_col2 = st.columns(2)
-                    
-                    # 初始化文档特定的session状态（如果不存在）
-                    if f"show_strategist_{file.name}" not in st.session_state:
-                        st.session_state[f"show_strategist_{file.name}"] = False
-                    if f"strategist_done_{file.name}" not in st.session_state:
-                        st.session_state[f"strategist_done_{file.name}"] = False
-                    if f"show_creator_{file.name}" not in st.session_state:
-                        st.session_state[f"show_creator_{file.name}"] = False
-                    if f"creator_done_{file.name}" not in st.session_state:
-                        st.session_state[f"creator_done_{file.name}"] = False
-                    
-                    with button_col1:
-                        if st.button(f"开始分析文档{idx + 1}", key=f"start_analysis_{idx}", use_container_width=True):
-                            st.session_state[f"show_strategist_{file.name}"] = True
-                            st.session_state[f"strategist_done_{file.name}"] = False
-                            st.rerun()
-                    
-                    with button_col2:
-                        if st.button(f"继续规划文档{idx + 1}", key=f"continue_to_creator_{idx}", use_container_width=True):
-                            st.session_state[f"show_creator_{file.name}"] = True
-                            st.session_state[f"creator_done_{file.name}"] = False
-                            st.rerun()
+            # 为每个文档创建独立的结果容器
+            with col1:
+                st.markdown("### 文档 1 分析区域")
+                doc1_name = uploaded_files[0].name
+                button_col1, button_col2 = st.columns(2)
+                
+                with button_col1:
+                    if st.button("开始分析文档1", key="start_analysis_0", use_container_width=True):
+                        st.session_state[f"show_strategist_{doc1_name}"] = True
+                        st.session_state[f"strategist_done_{doc1_name}"] = False
+                        st.rerun()
+                
+                with button_col2:
+                    if st.button("继续规划文档1", key="continue_to_creator_0", use_container_width=True):
+                        st.session_state[f"show_creator_{doc1_name}"] = True
+                        st.session_state[f"creator_done_{doc1_name}"] = False
+                        st.rerun()
+                
+                # 文档1的分析结果显示
+                if st.session_state.get(f"show_strategist_{doc1_name}", False):
+                    st.markdown("---")
+                    st.subheader("📊 文档1背景分析")
+                    if not st.session_state.get(f"strategist_done_{doc1_name}", False):
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
+                            )
+                            
+                            with st.spinner(f"正在分析 {doc1_name}..."):
+                                transcript_analysis = ""
+                                if st.session_state.transcript_analysis_done:
+                                    transcript_analysis = st.session_state.transcript_analysis_result
+                                
+                                result = agent.process_strategist(
+                                    st.session_state.documents[doc1_name],
+                                    school_plan,
+                                    transcript_analysis
+                                )
+                                
+                                if result["status"] == "success":
+                                    st.session_state.strategist_results[doc1_name] = result["strategist_analysis"]
+                                    st.session_state[f"strategist_done_{doc1_name}"] = True
+                                    st.success(f"✅ {doc1_name} 背景分析完成！")
+                                else:
+                                    st.error(f"{doc1_name} 背景分析出错: {result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.strategist_results[doc1_name])
+                        st.success("✅ 背景分析完成！")
+                
+                # 文档1的内容规划显示
+                if st.session_state.get(f"show_creator_{doc1_name}", False):
+                    st.markdown("---")
+                    st.subheader("📝 文档1内容规划")
+                    if not st.session_state.get(f"creator_done_{doc1_name}", False):
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
+                            )
+                            
+                            with st.spinner(f"正在规划 {doc1_name} 内容..."):
+                                creator_result = agent.process_creator(
+                                    st.session_state.strategist_results[doc1_name],
+                                    school_plan,
+                                    st.session_state.transcript_analysis_result,
+                                    custom_requirements
+                                )
+                                
+                                if creator_result["status"] == "success":
+                                    st.session_state.creator_results[doc1_name] = creator_result["creator_output"]
+                                    st.session_state[f"creator_done_{doc1_name}"] = True
+                                    st.success(f"✅ {doc1_name} 内容规划完成！")
+                                else:
+                                    st.error(f"{doc1_name} 内容规划出错: {creator_result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.creator_results[doc1_name])
+                        st.success("✅ 内容规划完成！")
+            
+            # 文档2的显示区域
+            with col2:
+                st.markdown("### 文档 2 分析区域")
+                doc2_name = uploaded_files[1].name
+                button_col1, button_col2 = st.columns(2)
+                
+                with button_col1:
+                    if st.button("开始分析文档2", key="start_analysis_1", use_container_width=True):
+                        st.session_state[f"show_strategist_{doc2_name}"] = True
+                        st.session_state[f"strategist_done_{doc2_name}"] = False
+                        st.rerun()
+                
+                with button_col2:
+                    if st.button("继续规划文档2", key="continue_to_creator_1", use_container_width=True):
+                        st.session_state[f"show_creator_{doc2_name}"] = True
+                        st.session_state[f"creator_done_{doc2_name}"] = False
+                        st.rerun()
+                
+                # 文档2的分析结果显示
+                if st.session_state.get(f"show_strategist_{doc2_name}", False):
+                    st.markdown("---")
+                    st.subheader("📊 文档2背景分析")
+                    if not st.session_state.get(f"strategist_done_{doc2_name}", False):
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
+                            )
+                            
+                            with st.spinner(f"正在分析 {doc2_name}..."):
+                                transcript_analysis = ""
+                                if st.session_state.transcript_analysis_done:
+                                    transcript_analysis = st.session_state.transcript_analysis_result
+                                
+                                result = agent.process_strategist(
+                                    st.session_state.documents[doc2_name],
+                                    school_plan,
+                                    transcript_analysis
+                                )
+                                
+                                if result["status"] == "success":
+                                    st.session_state.strategist_results[doc2_name] = result["strategist_analysis"]
+                                    st.session_state[f"strategist_done_{doc2_name}"] = True
+                                    st.success(f"✅ {doc2_name} 背景分析完成！")
+                                else:
+                                    st.error(f"{doc2_name} 背景分析出错: {result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.strategist_results[doc2_name])
+                        st.success("✅ 背景分析完成！")
+                
+                # 文档2的内容规划显示
+                if st.session_state.get(f"show_creator_{doc2_name}", False):
+                    st.markdown("---")
+                    st.subheader("📝 文档2内容规划")
+                    if not st.session_state.get(f"creator_done_{doc2_name}", False):
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
+                            )
+                            
+                            with st.spinner(f"正在规划 {doc2_name} 内容..."):
+                                creator_result = agent.process_creator(
+                                    st.session_state.strategist_results[doc2_name],
+                                    school_plan,
+                                    st.session_state.transcript_analysis_result,
+                                    custom_requirements
+                                )
+                                
+                                if creator_result["status"] == "success":
+                                    st.session_state.creator_results[doc2_name] = creator_result["creator_output"]
+                                    st.session_state[f"creator_done_{doc2_name}"] = True
+                                    st.success(f"✅ {doc2_name} 内容规划完成！")
+                                else:
+                                    st.error(f"{doc2_name} 内容规划出错: {creator_result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.creator_results[doc2_name])
+                        st.success("✅ 内容规划完成！")
         
         # 修改结果显示区域
         results_container = st.container()
@@ -906,8 +1035,8 @@ def main():
                 with results_container:
                     st.markdown("---")
                     st.subheader("📊 第一阶段：背景分析")
-                    
-                    # 获取唯一文档的名称
+                        
+                        # 获取唯一文档的名称
                     doc_name = list(st.session_state.documents.keys())[0]  # 添加这行来获取文档名称
                     
                     if not st.session_state.strategist_analysis_done:
@@ -923,7 +1052,7 @@ def main():
                                     transcript_analysis = st.session_state.transcript_analysis_result
                                 
                                 result = agent.process_strategist(
-                                    st.session_state.documents[doc_name],
+                                        st.session_state.documents[doc_name],
                                     school_plan,
                                     transcript_analysis
                                 )
@@ -939,14 +1068,14 @@ def main():
                     else:
                         st.markdown(st.session_state.strategist_results[doc_name])
                         st.success("✅ 背景分析完成！")
-
-            # 添加单文档内容规划显示逻辑
+            
+                # 添加单文档内容规划显示逻辑
             if st.session_state.show_creator_analysis:
                 with results_container:
                     st.markdown("---")
                     st.subheader("📝 第二阶段：内容规划")
-                    
-                    # 获取唯一文档的名称
+                        
+                        # 获取唯一文档的名称
                     doc_name = list(st.session_state.documents.keys())[0]
                     
                     if not st.session_state.creator_analysis_done:
@@ -963,7 +1092,7 @@ def main():
                                     st.session_state.transcript_analysis_result,
                                     custom_requirements
                                 )
-                                
+                                    
                                 if creator_result["status"] == "success":
                                     st.session_state.creator_results[doc_name] = creator_result["creator_output"]
                                     st.session_state.creator_analysis_done = True
