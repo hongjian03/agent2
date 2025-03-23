@@ -729,10 +729,45 @@ def main():
     
     with tab1:
         # 添加成绩单上传功能
-        transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+        col1, col2 = st.columns([3, 1])  # 创建两列，比例为3:1
+        with col1:
+            transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+        with col2:
+            # 添加清除成绩单按钮
+            if st.button("清除成绩单", key="clear_transcript"):
+                # 清除所有与成绩单相关的session状态
+                st.session_state.transcript_file = None
+                st.session_state.transcript_analysis_done = False
+                st.session_state.transcript_analysis_result = None
+                st.session_state.show_transcript_analysis = False
+                st.success("✅ 成绩单信息已清除！")
+                st.rerun()
         
-        # 添加文件上传功能
-        uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])
+        # 修改文件上传部分，支持多个文件
+        uploaded_files = st.file_uploader("上传初稿文档（可选择1-2个文件）", type=['docx'], accept_multiple_files=True)
+        
+        if len(uploaded_files) > 2:
+            st.error("最多只能上传2个文件进行分析")
+            st.stop()
+        
+        # 初始化多文件相关的session状态
+        if 'documents' not in st.session_state:
+            st.session_state.documents = {}  # 用于存储多个文档的内容
+        if 'strategist_results' not in st.session_state:
+            st.session_state.strategist_results = {}  # 用于存储多个文档的背景分析结果
+        if 'creator_results' not in st.session_state:
+            st.session_state.creator_results = {}  # 用于存储多个文档的内容规划结果
+        
+        # 处理上传的文件
+        for file in uploaded_files:
+            document_content = read_docx(file.read())
+            if document_content:
+                st.session_state.documents[file.name] = document_content
+                st.success(f"文件 {file.name} 上传成功！")
+                with st.expander(f"查看 {file.name} 内容", expanded=False):
+                    st.write(document_content)
+            else:
+                st.error(f"无法读取文件 {file.name}，请检查格式是否正确。")
         
         # 添加选校方案输入框
         school_plan = st.text_area(
@@ -750,45 +785,21 @@ def main():
             help="请输入特殊的定制需求，如果没有可以保持默认值"
         )
         
-        # 处理上传的成绩单
-        if transcript_file is not None:
-            st.session_state.transcript_file = transcript_file.read()
-            st.success("成绩单上传成功！")
-            
-            # 添加处理成绩单按钮
-            if st.button("处理成绩单", key="process_transcript"):
-                st.session_state.show_transcript_analysis = True
-                st.session_state.transcript_analysis_done = False
-                st.rerun()
-        
-        # 处理上传的文件
-        if uploaded_file is not None:
-            document_content = read_docx(uploaded_file.read())
-            if document_content:
-                st.session_state.document_content = document_content
-                st.success("个人陈述上传成功！")
-                with st.expander("查看个人陈述内容", expanded=False):
-                    st.write(document_content)
-            else:
-                st.error("无法读取文档内容，请检查文件格式是否正确。")
-        
-        # 按钮区域 - 始终在顶部
+        # 修改按钮区域
         button_col1, button_col2 = st.columns(2)
         
         with button_col1:
-            # 开始背景分析按钮
             if st.button("开始背景分析", key="start_analysis", use_container_width=True):
-                if st.session_state.document_content:
+                if st.session_state.documents:
                     st.session_state.show_strategist_analysis = True
                     st.session_state.strategist_analysis_done = False
                     st.session_state.creator_analysis_done = False
                     st.session_state.show_creator_analysis = False
-                    st.rerun()  # 强制重新运行应用
+                    st.rerun()
                 else:
                     st.warning("请先上传初稿文档")
         
         with button_col2:
-            # 继续内容规划按钮 - 只有在背景分析完成后才启用
             continue_button = st.button(
                 "继续内容规划", 
                 key="continue_to_creator", 
@@ -799,12 +810,12 @@ def main():
             if continue_button:
                 st.session_state.show_creator_analysis = True
                 st.session_state.creator_analysis_done = False
-                st.rerun()  # 强制重新运行应用
+                st.rerun()
         
-        # 创建结果显示区域
+        # 修改结果显示区域
         results_container = st.container()
         
-        # 显示成绩单分析（如果需要）
+        # 显示成绩单分析（保持不变）
         if st.session_state.show_transcript_analysis:
             with results_container:
                 st.markdown("---")
@@ -839,110 +850,163 @@ def main():
                     st.markdown(st.session_state.transcript_analysis_result)
                     st.success("✅ 成绩单分析完成！")
         
-        # 显示背景分析（如果需要）
+        # 修改背景分析显示
         if st.session_state.show_strategist_analysis:
             with results_container:
                 st.markdown("---")
                 st.subheader("📊 第一阶段：背景分析")
                 
-                if not st.session_state.strategist_analysis_done:
-                    try:
-                        agent = BrainstormingAgent(
-                            api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates
-                        )
-                        
-                        with st.spinner("正在进行背景分析..."):
-                            # 获取成绩单分析结果（如果有）
-                            transcript_analysis = ""
-                            if st.session_state.transcript_analysis_done:
-                                transcript_analysis = st.session_state.transcript_analysis_result
-                            
-                            # 处理第一阶段分析
-                            result = agent.process_strategist(
-                                st.session_state.document_content, 
-                                school_plan,
-                                transcript_analysis
+                # 创建列来并排显示多个文档的分析结果
+                if len(st.session_state.documents) == 1:
+                    # 单文档显示
+                    doc_name = list(st.session_state.documents.keys())[0]
+                    if not st.session_state.strategist_analysis_done:
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
                             )
                             
-                            if result["status"] == "success":
-                                # 保存策略分析结果到 session_state
-                                st.session_state.strategist_analysis_result = result["strategist_analysis"]
-                                st.session_state.strategist_analysis_done = True
-                                st.success("✅ 背景分析完成！")
-                                st.rerun()  # 强制重新运行应用以更新按钮状态
-                            else:
-                                st.error(f"背景分析出错: {result['message']}")
-                    
-                    except Exception as e:
-                        st.error(f"处理过程中出错: {str(e)}")
+                            with st.spinner(f"正在分析 {doc_name}..."):
+                                transcript_analysis = ""
+                                if st.session_state.transcript_analysis_done:
+                                    transcript_analysis = st.session_state.transcript_analysis_result
+                                
+                                result = agent.process_strategist(
+                                    st.session_state.documents[doc_name],
+                                    school_plan,
+                                    transcript_analysis
+                                )
+                                
+                                if result["status"] == "success":
+                                    st.session_state.strategist_results[doc_name] = result["strategist_analysis"]
+                                    st.session_state.strategist_analysis_done = True
+                                    st.success(f"✅ {doc_name} 背景分析完成！")
+                                else:
+                                    st.error(f"{doc_name} 背景分析出错: {result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.strategist_results[doc_name])
+                        st.success("✅ 背景分析完成！")
+                
                 else:
-                    # 如果已经完成，直接显示结果
-                    st.markdown(st.session_state.strategist_analysis_result)
-                    st.success("✅ 背景分析完成！")
+                    # 双文档并排显示
+                    col1, col2 = st.columns(2)
+                    for idx, (doc_name, content) in enumerate(st.session_state.documents.items()):
+                        display_col = col1 if idx == 0 else col2
+                        with display_col:
+                            st.markdown(f"### 文档 {idx + 1}: {doc_name}")
+                            if not st.session_state.strategist_analysis_done:
+                                try:
+                                    agent = BrainstormingAgent(
+                                        api_key=st.secrets["OPENROUTER_API_KEY"],
+                                        prompt_templates=st.session_state.prompt_templates
+                                    )
+                                    
+                                    with st.spinner(f"正在分析 {doc_name}..."):
+                                        transcript_analysis = ""
+                                        if st.session_state.transcript_analysis_done:
+                                            transcript_analysis = st.session_state.transcript_analysis_result
+                                        
+                                        result = agent.process_strategist(
+                                            content,
+                                            school_plan,
+                                            transcript_analysis
+                                        )
+                                        
+                                        if result["status"] == "success":
+                                            st.session_state.strategist_results[doc_name] = result["strategist_analysis"]
+                                            st.success(f"✅ {doc_name} 背景分析完成！")
+                                        else:
+                                            st.error(f"{doc_name} 背景分析出错: {result['message']}")
+                                except Exception as e:
+                                    st.error(f"处理过程中出错: {str(e)}")
+                            else:
+                                st.markdown(st.session_state.strategist_results[doc_name])
+                                st.success("✅ 背景分析完成！")
+                    
+                    if not st.session_state.strategist_analysis_done and len(st.session_state.strategist_results) == len(st.session_state.documents):
+                        st.session_state.strategist_analysis_done = True
+                        st.rerun()
         
-        # 显示内容规划（如果需要）
+        # 修改内容规划显示（类似背景分析的修改）
         if st.session_state.show_creator_analysis:
             with results_container:
                 st.markdown("---")
                 st.subheader("📝 第二阶段：内容规划")
                 
-                if not st.session_state.creator_analysis_done:
-                    try:
-                        agent = BrainstormingAgent(
-                            api_key=st.secrets["OPENROUTER_API_KEY"],
-                            prompt_templates=st.session_state.prompt_templates
-                        )
-                        
-                        with st.spinner("正在进行内容规划..."):
-                            creator_result = agent.process_creator(
-                                st.session_state.strategist_analysis_result,
-                                school_plan,
-                                st.session_state.transcript_analysis_result,
-                                custom_requirements
+                if len(st.session_state.documents) == 1:
+                    # 单文档显示
+                    doc_name = list(st.session_state.documents.keys())[0]
+                    if not st.session_state.creator_analysis_done:
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
                             )
                             
-                            if creator_result["status"] == "success":
-                                st.session_state.creator_analysis_result = creator_result["creator_output"]
-                                st.session_state.creator_analysis_done = True
-                                st.success("✅ 内容规划完成！")
-                            else:
-                                st.error(f"内容规划出错: {creator_result['message']}")
-                    
-                    except Exception as e:
-                        st.error(f"处理过程中出错: {str(e)}")
+                            with st.spinner(f"正在规划 {doc_name} 内容..."):
+                                creator_result = agent.process_creator(
+                                    st.session_state.strategist_results[doc_name],
+                                    school_plan,
+                                    st.session_state.transcript_analysis_result,
+                                    custom_requirements
+                                )
+                                
+                                if creator_result["status"] == "success":
+                                    st.session_state.creator_results[doc_name] = creator_result["creator_output"]
+                                    st.session_state.creator_analysis_done = True
+                                    st.success(f"✅ {doc_name} 内容规划完成！")
+                                else:
+                                    st.error(f"{doc_name} 内容规划出错: {creator_result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.creator_results[doc_name])
+                        st.success("✅ 内容规划完成！")
+                
                 else:
-                    # 如果已经完成，直接显示结果
-                    st.markdown(st.session_state.creator_analysis_result)
-                    st.success("✅ 内容规划完成！")
+                    # 双文档并排显示
+                    col1, col2 = st.columns(2)
+                    for idx, doc_name in enumerate(st.session_state.documents.keys()):
+                        display_col = col1 if idx == 0 else col2
+                        with display_col:
+                            st.markdown(f"### 文档 {idx + 1}: {doc_name}")
+                            if not st.session_state.creator_analysis_done:
+                                try:
+                                    agent = BrainstormingAgent(
+                                        api_key=st.secrets["OPENROUTER_API_KEY"],
+                                        prompt_templates=st.session_state.prompt_templates
+                                    )
+                                    
+                                    with st.spinner(f"正在规划 {doc_name} 内容..."):
+                                        creator_result = agent.process_creator(
+                                            st.session_state.strategist_results[doc_name],
+                                            school_plan,
+                                            st.session_state.transcript_analysis_result,
+                                            custom_requirements
+                                        )
+                                        
+                                        if creator_result["status"] == "success":
+                                            st.session_state.creator_results[doc_name] = creator_result["creator_output"]
+                                            st.success(f"✅ {doc_name} 内容规划完成！")
+                                        else:
+                                            st.error(f"{doc_name} 内容规划出错: {creator_result['message']}")
+                                except Exception as e:
+                                    st.error(f"处理过程中出错: {str(e)}")
+                            else:
+                                st.markdown(st.session_state.creator_results[doc_name])
+                                st.success("✅ 内容规划完成！")
+                    
+                    if not st.session_state.creator_analysis_done and len(st.session_state.creator_results) == len(st.session_state.documents):
+                        st.session_state.creator_analysis_done = True
+                        st.rerun()
     
     with tab2:
         st.title("提示词设置")
         
         prompt_templates = st.session_state.prompt_templates
-        
-        # 成绩单分析设置
-        st.subheader("成绩单分析")
-        transcript_role = st.text_area(
-            "角色设定",
-            value=prompt_templates.get_template('transcript_role'),
-            height=200,
-            key="transcript_role"
-        )
-        
-        transcript_task = st.text_area(
-            "任务说明",
-            value=prompt_templates.get_template('transcript_task'),
-            height=200,
-            key="transcript_task"
-        )
-        
-        transcript_output = st.text_area(
-            "输出格式",
-            value=prompt_templates.get_template('transcript_output'),
-            height=200,
-            key="transcript_output"
-        )
         
         # Agent 1 设置
         st.subheader("Agent 1 - 档案策略师")
@@ -992,9 +1056,6 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
-                prompt_templates.update_template('transcript_role', transcript_role)
-                prompt_templates.update_template('transcript_task', transcript_task)
-                prompt_templates.update_template('transcript_output', transcript_output)
                 prompt_templates.update_template('consultant_role1', consultant_role1)
                 prompt_templates.update_template('output_format1', output_format1)
                 prompt_templates.update_template('consultant_task1', consultant_task1)
