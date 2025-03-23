@@ -919,6 +919,42 @@ def main():
                     else:
                         st.markdown(st.session_state.strategist_results[doc_name])
                         st.success("✅ 背景分析完成！")
+
+            # 添加单文档内容规划显示逻辑
+            if st.session_state.show_creator_analysis:
+                with results_container:
+                    st.markdown("---")
+                    st.subheader("📝 第二阶段：内容规划")
+                    
+                    # 获取唯一文档的名称
+                    doc_name = list(st.session_state.documents.keys())[0]
+                    
+                    if not st.session_state.creator_analysis_done:
+                        try:
+                            agent = BrainstormingAgent(
+                                api_key=st.secrets["OPENROUTER_API_KEY"],
+                                prompt_templates=st.session_state.prompt_templates
+                            )
+                            
+                            with st.spinner(f"正在规划 {doc_name} 内容..."):
+                                creator_result = agent.process_creator(
+                                    st.session_state.strategist_results[doc_name],
+                                    school_plan,
+                                    st.session_state.transcript_analysis_result,
+                                    custom_requirements
+                                )
+                                
+                                if creator_result["status"] == "success":
+                                    st.session_state.creator_results[doc_name] = creator_result["creator_output"]
+                                    st.session_state.creator_analysis_done = True
+                                    st.success(f"✅ {doc_name} 内容规划完成！")
+                                else:
+                                    st.error(f"{doc_name} 内容规划出错: {creator_result['message']}")
+                        except Exception as e:
+                            st.error(f"处理过程中出错: {str(e)}")
+                    else:
+                        st.markdown(st.session_state.creator_results[doc_name])
+                        st.success("✅ 内容规划完成！")
         else:
             # 双文档显示
             col1, col2 = st.columns(2)
