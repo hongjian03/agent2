@@ -986,12 +986,20 @@ def main():
     
     with tab1:
         # 添加成绩单上传功能
-        col1, col2 = st.columns([3, 1])  # 创建两列，比例为3:1
+        col1, col2, col3 = st.columns([3, 1, 1])  # 修改为三列，比例为3:1:1
         with col1:
             transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
         with col2:
+            # 添加分析成绩单按钮
+            if st.button("分析成绩单", key="analyze_transcript", use_container_width=True):
+                if transcript_file is not None:
+                    st.session_state.transcript_file = transcript_file
+                    st.session_state.show_transcript_analysis = True
+                    st.session_state.transcript_analysis_done = False
+                    st.rerun()
+        with col3:
             # 添加清除成绩单按钮
-            if st.button("清除成绩单", key="clear_transcript"):
+            if st.button("清除成绩单", key="clear_transcript", use_container_width=True):
                 # 清除所有与成绩单相关的session状态
                 st.session_state.transcript_file = None
                 st.session_state.transcript_analysis_done = False
