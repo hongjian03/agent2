@@ -1335,8 +1335,6 @@ def main():
                                 custom_requirements = ""
                                 if st.session_state.transcript_analysis_done:
                                     transcript_analysis = st.session_state.transcript_analysis_result
-                                if st.session_state.custom_requirements_done:
-                                    custom_requirements = st.session_state.custom_requirements
                                 result = agent.process_strategist(
                                     st.session_state.documents[doc_name],
                                     school_plan,
