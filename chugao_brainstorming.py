@@ -364,7 +364,7 @@ class TranscriptAnalyzer:
             logger.error(f"提取PDF图像时出错: {str(e)}")
             return []
     
-    def analyze_transcript(self, pdf_bytes, school_plan: str) -> Dict[str, Any]:
+    def analyze_transcript(self, pdf_bytes) -> Dict[str, Any]:
         try:
             if not hasattr(self, 'prompt_templates'):
                 logger.error("prompt_templates not initialized")
