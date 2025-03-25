@@ -593,7 +593,7 @@ class BrainstormingAgent:
                 "status": "error",
                 "message": str(e)
             }
-    def process_creator(self, strategist_analysis: str, school_plan: str, transcript_analysis: str = "", custom_requirements: str = "无定制需求") -> Dict[str, Any]:
+    def process_creator(self, strategist_analysis: str, school_plan: str, transcript_analysis: str = "", custom_requirements: str = "无定制需求",document_content: str = "") -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
@@ -1142,7 +1142,8 @@ def main():
                                 result = agent.process_strategist(
                                     st.session_state.documents[doc1_name],
                                     school_plan,
-                                    transcript_analysis
+                                    transcript_analysis,
+                                    custom_requirements
                                 )
                                 
                                 if result["status"] == "success":
@@ -1375,7 +1376,8 @@ def main():
                                     st.session_state.strategist_results[doc_name],
                                     school_plan,
                                     st.session_state.transcript_analysis_result,
-                                    custom_requirements
+                                    custom_requirements,
+                                    st.session_state.documents[doc_name]
                                 )
                                     
                                 if creator_result["status"] == "success":
