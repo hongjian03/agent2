@@ -624,6 +624,7 @@ class BrainstormingAgent:
                     result = self.creator_chain(
                         {
                             "strategist_analysis": strategist_analysis,
+                            "document_content": document_content,  # 添加文档内容
                             "school_plan": school_plan,
                             "transcript_analysis": transcript_analysis,
                             "custom_requirements": custom_requirements
