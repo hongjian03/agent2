@@ -1014,9 +1014,15 @@ def main():
     
     with tab1:
         # 添加成绩单上传功能
-        col1, col2, col3 = st.columns([3, 1, 1])  # 修改为三列，比例为3:1:1
+        col1, col2 = st.columns([3, 1])  # 修改为两列，移除第三列
         with col1:
             transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+            # 自动检查文件状态并清除相关内存
+            if not transcript_file:
+                st.session_state.transcript_file = None
+                st.session_state.transcript_analysis_done = False
+                st.session_state.transcript_analysis_result = None
+                st.session_state.show_transcript_analysis = False
         with col2:
             # 添加分析成绩单按钮
             if st.button("分析成绩单", key="analyze_transcript", use_container_width=True):
@@ -1025,16 +1031,6 @@ def main():
                     st.session_state.show_transcript_analysis = True
                     st.session_state.transcript_analysis_done = False
                     st.rerun()
-        with col3:
-            # 添加清除成绩单按钮
-            if st.button("清除成绩单", key="clear_transcript", use_container_width=True):
-                # 清除所有与成绩单相关的session状态
-                st.session_state.transcript_file = None
-                st.session_state.transcript_analysis_done = False
-                st.session_state.transcript_analysis_result = None
-                st.session_state.show_transcript_analysis = False
-                st.success("✅ 成绩单信息已清除！")
-                st.rerun()
         
         # 修改文件上传部分，移除多文件支持
         col1, col2 = st.columns([3, 1])
