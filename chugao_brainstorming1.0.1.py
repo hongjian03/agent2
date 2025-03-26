@@ -1454,7 +1454,7 @@ def main():
             # 修改模型信息显示
         st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
         st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
-        st.write(st.session_state.strategist_analysis_result)
+        
     
     with tab2:
         st.title("提示词设置")
