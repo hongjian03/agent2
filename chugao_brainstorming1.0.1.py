@@ -610,18 +610,20 @@ class TranscriptAnalyzer:
             thread = Thread(target=run_analysis)
             thread.start()
             
-            # 使用 st.write_stream 显示流式输出
+            # 用于流式输出的容器
             output_container = st.empty()
+            
+            # 流式输出
             with output_container:
                 full_response = st.write_stream(token_generator())
             
-            # 完成后，使用st.markdown重新渲染整个响应
-            if full_response:  # 确保有内容
-                output_container.empty()  # 清空原始输出
-                output_container.markdown(full_response)  # 使用markdown渲染
-            
             # 等待线程完成
             thread.join()
+            
+            # 清空原容器并使用markdown重新渲染完整响应
+            if full_response:
+                output_container.empty()
+                output_container.markdown(full_response)
             
             # 获取结果
             if hasattr(thread, "exception") and thread.exception:
@@ -742,18 +744,22 @@ class BrainstormingAgent:
             thread = Thread(target=run_llm)
             thread.start()
             
-            # 使用 st.write_stream 显示流式输出
+            # 创建流式输出容器
             output_container = st.empty()
+            
+            # 流式输出
             with output_container:
                 full_response = st.write_stream(token_generator())
             
-            # 完成后，使用st.markdown重新渲染整个响应
-            if full_response:  # 确保有内容
-                output_container.empty()  # 清空原始输出
-                output_container.markdown(full_response)  # 使用markdown渲染
-            
             # 等待线程完成
             thread.join()
+            
+            # 清空原容器并使用markdown重新渲染完整响应
+            if full_response:
+                output_container.empty()
+                new_container = st.container()
+                with new_container:
+                    st.markdown(full_response)
             
             # 获取结果
             if hasattr(thread, "exception") and thread.exception:
@@ -823,19 +829,21 @@ class BrainstormingAgent:
             thread = Thread(target=run_llm)
             thread.start()
             
-            # 使用 st.write_stream 显示流式输出
+            # 创建流式输出容器
             output_container = st.empty()
+            
+            # 流式输出
             with output_container:
                 full_response = st.write_stream(token_generator())
             
-            # 完成后，使用st.markdown重新渲染整个响应
-            if full_response:  # 确保有内容
-                output_container.empty()  # 清空原始输出
-                output_container.markdown(full_response)  # 使用markdown渲染
-            
             # 等待线程完成
             thread.join()
-            
+            # 清空原容器并使用markdown重新渲染完整响应
+            if full_response:
+                output_container.empty()
+                new_container = st.container()
+                with new_container:
+                    st.markdown(full_response)
             # 获取结果
             if hasattr(thread, "_exception") and thread._exception:
                 raise thread._exception
