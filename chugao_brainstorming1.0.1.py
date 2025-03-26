@@ -358,13 +358,12 @@ class PromptTemplates:
 class TranscriptAnalyzer:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
         self.prompt_templates = prompt_templates
-        # 确保 templates 存在于 session_state 中
         if 'templates' not in st.session_state:
             st.session_state.templates = self.prompt_templates.default_templates.copy()
             
         self.llm = ChatOpenAI(
-            temperature=0.7,
-            model=st.secrets["TRANSCRIPT_MODEL"],
+            temperature=0.2,
+            model=st.session_state.transcript_model,  # 使用session state中的模型
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             streaming=True
@@ -497,8 +496,8 @@ class TranscriptAnalyzer:
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
         self.llm = ChatOpenAI(
-            temperature=0.7,
-            model=st.secrets["OPENROUTER_MODEL"],
+            temperature=0.2,
+            model=st.session_state.text_model,  # 使用session state中的模型
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
             streaming=True
@@ -976,6 +975,90 @@ def main():
     add_custom_css()
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
+    # 添加模型选择
+    col1, col2 = st.columns(2)
+    with col1:
+        if 'transcript_model' not in st.session_state:
+            st.session_state.transcript_model = st.secrets["TRANSCRIPT_MODEL"]
+        
+        transcript_model = st.selectbox(
+            "选择图像分析模型",
+            ["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free"],
+            index=["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free"].index(st.session_state.transcript_model)
+        )
+        if transcript_model != st.session_state.transcript_model:
+            st.session_state.transcript_model = transcript_model
+            st.rerun()
+            
+    with col2:
+        if 'text_model' not in st.session_state:
+            st.session_state.text_model = st.secrets["OPENROUTER_MODEL"]
+            
+        text_model = st.selectbox(
+            "选择文本分析模型",
+            ["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1"],
+            index=["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1"].index(st.session_state.text_model)
+        )
+        if text_model != st.session_state.text_model:
+            st.session_state.text_model = text_model
+            st.rerun()
+
+    # 添加单个模型信息展开框
+    with st.expander("查看模型详细信息", expanded=False):
+        st.markdown("""
+        ### 图像分析模型
+        
+        **google/gemma-3-27b-it:free**
+        - 参数量：27B
+        - 特点：支持图像理解和分析，适合处理复杂的图像内容
+        - 免费版本，适合一般用途
+        
+        **google/gemini-2.0-flash-001**
+        - 特点：快速处理能力，适合实时分析
+        - 优化：针对图像分析任务进行了特殊优化
+        
+        **google/gemini-2.5-pro-exp-03-25:free**
+        - 最新版本的Gemini模型
+        - 增强了多模态理解能力
+        - 支持更复杂的图像分析任务
+        
+        **qwen/qwen2.5-vl-32b-instruct:free**
+        - 参数量：32B
+        - 特点：强大的视觉语言理解能力
+        - 支持中英双语分析
+        
+        ### 文本分析模型
+        
+        **qwen/qwq-32b:free**
+        - 参数量：32B
+        - 特点：强大的中文理解和生成能力
+        - 免费版本，适合一般用途
+        
+        **qwen/qwq-32b**
+        - 完整版本，性能更优
+        - 更稳定的输出质量
+        - 更好的上下文理解能力
+        
+        **google/gemini-2.5-pro-exp-03-25:free**
+        - 最新版本的Gemini模型
+        - 优秀的文本理解和生成能力
+        - 支持复杂的推理任务
+        
+        **deepseek/deepseek-chat-v3-0324:free**
+        - 最新的v3版本
+        - 增强的对话能力
+        - 更好的逻辑推理能力
+        
+        **deepseek/deepseek-r1:free & deepseek/deepseek-r1**
+        - R1系列模型
+        - 专注于学术和专业领域
+        - 更强的专业知识理解能力
+        """)
+
+    # 修改模型信息显示
+    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
+    
     # 确保在任何操作之前初始化 PromptTemplates
     if 'templates' not in st.session_state:
         prompt_templates = PromptTemplates()
@@ -985,8 +1068,6 @@ def main():
         st.session_state.prompt_templates = PromptTemplates()
     
     tab1, tab2 = st.tabs(["初稿脑暴助理", "提示词设置"])
-    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.secrets['TRANSCRIPT_MODEL']}</b></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.secrets['OPENROUTER_MODEL']}</b></div>", unsafe_allow_html=True)
     
     # 初始化会话状态变量
     if 'document_content' not in st.session_state:
