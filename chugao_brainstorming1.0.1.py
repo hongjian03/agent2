@@ -983,8 +983,8 @@ def main():
         
         transcript_model = st.selectbox(
             "选择图像分析模型",
-            ["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free"],
-            index=["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free"].index(st.session_state.transcript_model)
+            ["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free","anthropic/claude-3.7-sonnet"],
+            index=["google/gemma-3-27b-it:free","google/gemini-2.0-flash-001","google/gemini-2.5-pro-exp-03-25:free", "qwen/qwen2.5-vl-32b-instruct:free","anthropic/claude-3.7-sonnet"].index(st.session_state.transcript_model)
         )
         if transcript_model != st.session_state.transcript_model:
             st.session_state.transcript_model = transcript_model
@@ -996,8 +996,8 @@ def main():
             
         text_model = st.selectbox(
             "选择文本分析模型",
-            ["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1"],
-            index=["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1"].index(st.session_state.text_model)
+            ["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1","anthropic/claude-3.7-sonnet"],
+            index=["qwen/qwq-32b:free","qwen/qwq-32b","google/gemini-2.5-pro-exp-03-25:free", "deepseek/deepseek-chat-v3-0324:free", "deepseek/deepseek-r1:free","deepseek/deepseek-r1","anthropic/claude-3.7-sonnet"].index(st.session_state.text_model)
         )
         if text_model != st.session_state.text_model:
             st.session_state.text_model = text_model
@@ -1010,49 +1010,48 @@ def main():
         
         **google/gemma-3-27b-it:free**
         - 参数量：27B
-        - 特点：支持图像理解和分析，适合处理复杂的图像内容
-        - 免费版本，适合一般用途
+        - Created Mar 12, 2025 | 96,000 context | $0/M input tokens | $0/M output tokens
         
         **google/gemini-2.0-flash-001**
-        - 特点：快速处理能力，适合实时分析
-        - 优化：针对图像分析任务进行了特殊优化
+        - Created Feb 5, 2025 |  1,000,000 context |  $0.1/M input tokens  | $0.4/M output tokens |  $0.0258/K input imgs
         
         **google/gemini-2.5-pro-exp-03-25:free**
         - 最新版本的Gemini模型
-        - 增强了多模态理解能力
-        - 支持更复杂的图像分析任务
+        - Created Mar 25, 2025 | 1,000,000 context | $0/M input tokens | $0/M output tokens
         
         **qwen/qwen2.5-vl-32b-instruct:free**
         - 参数量：32B
-        - 特点：强大的视觉语言理解能力
-        - 支持中英双语分析
+        - Created Mar 24, 2025 | 8,192 context | $0/M input tokens | $0/M output tokens
+                    
+        **anthropic/claude-3.7-sonnet**
+        - 参数量：32B
+        - Created Feb 24, 2025 | 200,000 context | $3/M input tokens | $15/M output tokens | $4.8/K input imgs
         
         ### 文本分析模型
         
         **qwen/qwq-32b:free**
         - 参数量：32B
-        - 特点：强大的中文理解和生成能力
-        - 免费版本，适合一般用途
+        - Created Mar 5, 2025 | 40,000 context | $0/M input tokens | $0/M output tokens
         
         **qwen/qwq-32b**
         - 完整版本，性能更优
-        - 更稳定的输出质量
-        - 更好的上下文理解能力
+        - Created Mar 5, 2025 | 131,072 context | $0.12/M input tokens  | $0.18/M output tokens
         
         **google/gemini-2.5-pro-exp-03-25:free**
         - 最新版本的Gemini模型
-        - 优秀的文本理解和生成能力
-        - 支持复杂的推理任务
+        - Created Mar 25, 2025 | 1,000,000 context | $0/M input tokens | $0/M output tokens
         
         **deepseek/deepseek-chat-v3-0324:free**
         - 最新的v3版本
-        - 增强的对话能力
-        - 更好的逻辑推理能力
+        - Created Mar 24, 2025 | 131,072 context | $0/M input tokens | $0/M output tokens
         
         **deepseek/deepseek-r1:free & deepseek/deepseek-r1**
-        - R1系列模型
-        - 专注于学术和专业领域
-        - 更强的专业知识理解能力
+        - Created Jan 20, 2025 | 163,840 context | $0/M input tokens | $0/M output tokens
+                    
+        **anthropic/claude-3.7-sonnet**
+        - 参数量：32B
+        - Created Feb 24, 2025 | 200,000 context | $3/M input tokens | $15/M output tokens | $4.8/K input imgs
+        
         """)
 
     # 修改模型信息显示
