@@ -253,21 +253,19 @@ class PromptTemplates:
             15.以markdown形式输出，确保经过markdown渲染后可以正确清晰的显示
 
             输出时必须严格使用以下markdown格式：
-            1. 使用单个井号(#)作为一级标题，确保井号与文字之间有空格
-            2. 使用两个井号(##)作为二级标题，确保井号与文字之间有空格
-            3. 使用三个井号(###)作为三级标题，确保井号与文字之间有空格
-            4. 使用四个井号(####)作为四级标题，确保井号与文字之间有空格
-            5. 在专业方向名称两侧使用双星号(**)实现加粗，如：**计算机图形学**
-            6. 使用减号(-)创建无序列表，确保减号与文字之间有空格
-            7. 子列表需要缩进两个空格后再使用减号
-            8. 使用星号(*)包围文本实现斜体，如：*核心信息点*
-            9. 在段落之间保留空行以确保正确渲染
-            10. 可使用三个减号(---)创建分隔线
-            11. 不要使用任何HTML标签
-            12. 必须确保每个markdown语法标记与相邻文本间有正确的空格
-            13. 请特别注意，不要使用```符号来标记代码块，如需标记重点内容请使用星号实现斜体或加粗
-
-            示例格式：
+            1. 每个#符号前不要有空格，确保是行首第一个字符
+            2. 使用 # 作为一级标题（不是变量名中的#，而是标题标记）
+            3. 使用 ## 作为二级标题
+            4. 使用 ### 作为三级标题
+            5. 使用 #### 作为四级标题 
+            6. 专业方向名称使用双星号(**计算机科学**)加粗
+            7. 使用减号(-)创建列表项，确保减号后有空格
+            8. 用星号标记斜体(*重要内容*)
+            9. 使用三个减号(---)创建分隔线
+            10. 确保段落之间有空行
+            11. 不要使用任何HTML标签或特殊符号
+            
+            完整输出示例：
             # 个人陈述初稿写作策略报告
 
             ## 一、专业方向分析
@@ -279,17 +277,17 @@ class PromptTemplates:
             招生倾向分析：
             - 强调跨学科技术整合能力
             - 重视实际项目开发经验
-
+            
             ## 二、段落素材策略与增强指南
             ### 专业方向1
             #### 1. 专业兴趣段落
-            **选择素材**：[具体素材]
+            **选择素材**：具体素材描述
             
-            **现有基础**：[简述内容]
+            **现有基础**：基础描述
             
             **增强策略**：
             - *A. 确定写作角度*
-              - 选择角度说明
+              - 角度说明
               - 选择理由
             """,
             
@@ -617,6 +615,11 @@ class TranscriptAnalyzer:
             with output_container:
                 full_response = st.write_stream(token_generator())
             
+            # 完成后，使用st.markdown重新渲染整个响应
+            if full_response:  # 确保有内容
+                output_container.empty()  # 清空原始输出
+                output_container.markdown(full_response)  # 使用markdown渲染
+            
             # 等待线程完成
             thread.join()
             
@@ -744,6 +747,11 @@ class BrainstormingAgent:
             with output_container:
                 full_response = st.write_stream(token_generator())
             
+            # 完成后，使用st.markdown重新渲染整个响应
+            if full_response:  # 确保有内容
+                output_container.empty()  # 清空原始输出
+                output_container.markdown(full_response)  # 使用markdown渲染
+            
             # 等待线程完成
             thread.join()
             
@@ -819,6 +827,11 @@ class BrainstormingAgent:
             output_container = st.empty()
             with output_container:
                 full_response = st.write_stream(token_generator())
+            
+            # 完成后，使用st.markdown重新渲染整个响应
+            if full_response:  # 确保有内容
+                output_container.empty()  # 清空原始输出
+                output_container.markdown(full_response)  # 使用markdown渲染
             
             # 等待线程完成
             thread.join()
