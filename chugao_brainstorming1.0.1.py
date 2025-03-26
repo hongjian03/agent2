@@ -1413,7 +1413,8 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    st.markdown(st.session_state.strategist_analysis_result)
+                    # 使用markdown方法并明确指定unsafe_allow_html参数
+                    st.markdown(st.session_state.strategist_analysis_result, unsafe_allow_html=True)
                     st.success("✅ 背景分析完成！")
         
         # 修改内容规划显示，只保留单文档逻辑
@@ -1447,12 +1448,12 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    st.markdown(st.session_state.creator_analysis_result)
+                    # 使用markdown方法并明确指定unsafe_allow_html参数
+                    st.markdown(st.session_state.creator_analysis_result, unsafe_allow_html=True)
                     st.success("✅ 内容规划完成！")
             # 修改模型信息显示
         st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
         st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
-        st.markdown(st.session_state.strategist_analysis_result)
         st.write(st.session_state.strategist_analysis_result)
     
     with tab2:
