@@ -214,7 +214,7 @@ class PromptTemplates:
             基本任务：
             1.仔细阅读和充分理解用户上传的素材表document_content、输入的个性化需求custom_requirements、分析用户上传的成绩单transcript_analysis、分析用户提供的申请专业方向或详细的选校规划school_plan
             2.准确识别用户指定的申请方向：
-                - 如用户提供明确的申请方向名称（如"公共政策"），则必须严格以用户提供的名称为唯一分析对象，完全忽略素材表中的任何专业信息，不得结合或修改用户指定的方向名称
+                - 如用户提供明确的申请专业方向名称（如"公共政策"），则必须严格以用户提供的名称为唯一分析对象，完全忽略素材表中的任何专业信息，不得结合或修改用户指定的方向名称
                 - 如用户提供详细选校规划，则需分析各院校专业的共性与差异，归类为1-2个专业大类方向
                 - 禁止根据用户提供的申请专业方向及心仪院校确认申请方向
                 - 禁止将用户提供的素材表中的任何申请院校信息内容纳入选校规划的分析
@@ -593,7 +593,7 @@ class BrainstormingAgent:
                 "status": "error",
                 "message": str(e)
             }
-    def process_creator(self, strategist_analysis: str, school_plan: str, transcript_analysis: str = "", custom_requirements: str = "无定制需求",document_content: str = "") -> Dict[str, Any]:
+    def process_creator(self, strategist_analysis: str, document_content: str, school_plan: str, transcript_analysis: str = "", custom_requirements: str = "无定制需求") -> Dict[str, Any]:
         try:
             # 创建一个队列用于流式输出
             message_queue = Queue()
@@ -603,7 +603,7 @@ class BrainstormingAgent:
                 def __init__(self, queue):
                     self.queue = queue
                     super().__init__()
-            
+                
                 def on_llm_new_token(self, token: str, **kwargs) -> None:
                     self.queue.put(token)
             
@@ -1172,10 +1172,11 @@ def main():
                             
                             with st.spinner(f"正在规划 {doc1_name} 内容..."):
                                 creator_result = agent.process_creator(
-                                    st.session_state.strategist_results[doc1_name],
-                                    school_plan,
-                                    st.session_state.transcript_analysis_result,
-                                    custom_requirements
+                                    strategist_analysis=st.session_state.strategist_results[doc1_name],
+                                    document_content=st.session_state.documents[doc1_name],
+                                    school_plan=school_plan,
+                                    transcript_analysis=st.session_state.transcript_analysis_result,
+                                    custom_requirements=custom_requirements
                                 )
                                 
                                 if creator_result["status"] == "success":
@@ -1255,10 +1256,11 @@ def main():
                             
                             with st.spinner(f"正在规划 {doc2_name} 内容..."):
                                 creator_result = agent.process_creator(
-                                    st.session_state.strategist_results[doc2_name],
-                                    school_plan,
-                                    st.session_state.transcript_analysis_result,
-                                    custom_requirements
+                                    strategist_analysis=st.session_state.strategist_results[doc2_name],
+                                    document_content=st.session_state.documents[doc2_name],
+                                    school_plan=school_plan,
+                                    transcript_analysis=st.session_state.transcript_analysis_result,
+                                    custom_requirements=custom_requirements
                                 )
                                 
                                 if creator_result["status"] == "success":
@@ -1374,11 +1376,11 @@ def main():
                             
                             with st.spinner(f"正在规划 {doc_name} 内容..."):
                                 creator_result = agent.process_creator(
-                                    st.session_state.strategist_results[doc_name],
-                                    school_plan,
-                                    st.session_state.transcript_analysis_result,
-                                    custom_requirements,
-                                    st.session_state.documents[doc_name]
+                                    strategist_analysis=st.session_state.strategist_results[doc_name],
+                                    document_content=st.session_state.documents[doc_name],
+                                    school_plan=school_plan,
+                                    transcript_analysis=st.session_state.transcript_analysis_result,
+                                    custom_requirements=custom_requirements
                                 )
                                     
                                 if creator_result["status"] == "success":
