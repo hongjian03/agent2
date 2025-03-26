@@ -1117,54 +1117,50 @@ def main():
         
         **google/gemma-3-27b-it:free**
         - 参数量：27B
-        - Created Mar 12, 2025 | 96,000 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 12, 2025 | 96,000 context | $0/M  input tokens | $0\/M output tokens
         
         **google/gemini-2.0-flash-001**
-        - Created Feb 5, 2025 |  1,000,000 context |  $0.1\/M input tokens  | $0.4\/M output tokens |  $0.0258\/K input imgs
+        - Created Feb 5, 2025 |  1,000,000 context |  $0.1/M  input tokens  | $0.4\/M output tokens |  $0.0258\/K input imgs
         
         **google/gemini-2.5-pro-exp-03-25:free**
         - 最新版本的Gemini模型
-        - Created Mar 25, 2025 | 1,000,000 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 25, 2025 | 1,000,000 context | $0/M  input tokens | $0\/M output tokens
         
         **qwen/qwen2.5-vl-32b-instruct:free**
         - 参数量：32B
-        - Created Mar 24, 2025 | 8,192 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 24, 2025 | 8,192 context | $0/M  input tokens | $0\/M output tokens
                     
         **anthropic/claude-3.7-sonnet**
         - 参数量：32B
-        - Created Feb 24, 2025 | 200,000 context | $3\/M input tokens | $15\/M output tokens | $4.8\/K input imgs
+        - Created Feb 24, 2025 | 200,000 context | $3/M  input tokens | $15\/M output tokens | $4.8\/K input imgs
         
         ### 文本分析模型
         
         **qwen/qwq-32b:free**
         - 参数量：32B
-        - Created Mar 5, 2025 | 40,000 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 5, 2025 | 40,000 context | $0/M input tokens | $0\/M output tokens
         
         **qwen/qwq-32b**
         - 完整版本，性能更优
-        - Created Mar 5, 2025 | 131,072 context | $0.12\/M input tokens  | $0.18\/M output tokens
+        - Created Mar 5, 2025 | 131,072 context | $0.12/M input tokens  | $0.18\/M output tokens
         
         **google/gemini-2.5-pro-exp-03-25:free**
         - 最新版本的Gemini模型
-        - Created Mar 25, 2025 | 1,000,000 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 25, 2025 | 1,000,000 context | $0/M input tokens | $0\/M output tokens
         
         **deepseek/deepseek-chat-v3-0324:free**
         - 最新的v3版本
-        - Created Mar 24, 2025 | 131,072 context | $0\/M input tokens | $0\/M output tokens
+        - Created Mar 24, 2025 | 131,072 context | $0/M input tokens | $0\/M output tokens
         
         **deepseek/deepseek-r1:free & deepseek/deepseek-r1**
-        - Created Jan 20, 2025 | 163,840 context | $0\/M input tokens | $0\/M output tokens
+        - Created Jan 20, 2025 | 163,840 context | $0/M input tokens | $0\/M output tokens
                     
         **anthropic/claude-3.7-sonnet**
         - 参数量：32B
-        - Created Feb 24, 2025 | 200,000 context | $3\/M input tokens | $15\/M output tokens | $4.8\/K input imgs
+        - Created Feb 24, 2025 | 200,000 context | $3/M input tokens | $15\/M output tokens | $4.8\/K input imgs
         
         """)
 
-    # 修改模型信息显示
-    st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
-    st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
-    
     # 确保在任何操作之前初始化 PromptTemplates
     if 'templates' not in st.session_state:
         prompt_templates = PromptTemplates()
@@ -1200,40 +1196,28 @@ def main():
         st.session_state.show_creator_analysis = False
     
     with tab1:
-        # 添加成绩单上传功能
-        col1, col2 = st.columns([3, 1])  # 修改为两列，移除第三列
-        with col1:
-            transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
-            # 自动检查文件状态并清除相关内存
-            if not transcript_file:
-                st.session_state.transcript_file = None
+       
+        
+        transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+        # 自动检查文件状态并清除相关内存
+        if not transcript_file:
+            st.session_state.transcript_file = None
+            st.session_state.transcript_analysis_done = False
+            st.session_state.transcript_analysis_result = None
+            st.session_state.show_transcript_analysis = False
+        
+        # 添加分析成绩单按钮
+        if st.button("分析成绩单", key="analyze_transcript", use_container_width=True):
+            if transcript_file is not None:
+                st.session_state.transcript_file = transcript_file
+                st.session_state.show_transcript_analysis = True
                 st.session_state.transcript_analysis_done = False
-                st.session_state.transcript_analysis_result = None
-                st.session_state.show_transcript_analysis = False
-        with col2:
-            # 添加分析成绩单按钮
-            if st.button("分析成绩单", key="analyze_transcript", use_container_width=True):
-                if transcript_file is not None:
-                    st.session_state.transcript_file = transcript_file
-                    st.session_state.show_transcript_analysis = True
-                    st.session_state.transcript_analysis_done = False
-                    st.rerun()
+                st.rerun()
         
         # 修改文件上传部分，移除多文件支持
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
-        with col2:
-            # 添加清除分析结果按钮
-            if st.button("清除所有分析", key="clear_analysis", use_container_width=True):
-                # 清除所有分析相关的session状态
-                st.session_state.document_content = None
-                st.session_state.strategist_analysis_done = False
-                st.session_state.creator_analysis_done = False
-                st.session_state.show_strategist_analysis = False
-                st.session_state.show_creator_analysis = False
-                st.success("✅ 所有分析结果已清除！")
-                st.rerun()
+        
+        
+        uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
         
         # 处理上传的文件
         if uploaded_file:
@@ -1284,7 +1268,16 @@ def main():
                 st.session_state.show_creator_analysis = True
                 st.session_state.creator_analysis_done = False
                 st.rerun()
-        
+                # 添加清除分析结果按钮
+        if st.button("清除所有分析", key="clear_analysis", use_container_width=True):
+            # 清除所有分析相关的session状态
+            st.session_state.document_content = None
+            st.session_state.strategist_analysis_done = False
+            st.session_state.creator_analysis_done = False
+            st.session_state.show_strategist_analysis = False
+            st.session_state.show_creator_analysis = False
+            st.success("✅ 所有分析结果已清除！")
+            st.rerun()
         # 修改结果显示区域，只保留单文档逻辑
         results_container = st.container()
         
@@ -1396,6 +1389,9 @@ def main():
                 else:
                     st.markdown(st.session_state.creator_analysis_result)
                     st.success("✅ 内容规划完成！")
+            # 修改模型信息显示
+        st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='model-info'>🤖 背景分析及内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
         
     
     with tab2:
