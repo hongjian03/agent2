@@ -679,7 +679,7 @@ class TranscriptAnalyzer:
                 ("human", "素材表document_content：\n{document_content}")
             ])
             
-            self.simplifie_chain = LLMChain(
+            self.simplifier_chain = LLMChain(
                 llm=self.simplifier_llm,
                 prompt=simplifier_prompt,
                 output_key="simplifier_result",
