@@ -538,7 +538,7 @@ class TranscriptAnalyzer:
             base_url="https://openrouter.ai/api/v1",
             streaming=True
         )
-        self.setup_simplifier_chains
+        self.setup_simplifier_chains()
 
     def extract_images_from_pdf(self, pdf_bytes):
         """从PDF中提取图像"""
