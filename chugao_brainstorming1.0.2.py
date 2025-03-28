@@ -487,7 +487,7 @@ class PromptTemplates:
             "material_simplifier_role": """
             你是一位优秀的素材简化专家。你的任务是分析学生提供的素材表，提取其中最有价值、最相关的信息，形成一个简化版本。
             """,
-            "material_simplifier_tesk": """
+            "material_simplifier_task": """
             请关注：
             1. 学生的核心成就和经历
             2. 能体现学生特点和优势的关键信息
@@ -1680,9 +1680,9 @@ def main():
         )
         output_format_simplifier = st.text_area(
             "输出格式",
-            value=prompt_templates.get_template('material_simplifier_output_format'),
+            value=prompt_templates.get_template('material_simplifier_output'),
             height=200,
-            key="material_simplifier_output_format"
+            key="material_simplifier_output"
         )
         
         # Agent 1 设置
