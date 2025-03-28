@@ -1585,9 +1585,15 @@ def main():
                             transcript_analysis = ""
                             if st.session_state.transcript_analysis_done:
                                 transcript_analysis = st.session_state.transcript_analysis_result
-                            
+                            document_content_simple = ""
+                            if st.session_state.simplifier_result == None:
+                                document_content_simple = st.session_state.document_content
+                                st.write("使用原始素材表进行分析")
+                            else:
+                                document_content_simple = st.session_state.simplifier_result
+                                st.write("使用简化后素材表进行分析")
                             result = agent.process_strategist(
-                                st.session_state.document_content,
+                                document_content_simple,
                                 school_plan,
                                 transcript_analysis,
                                 custom_requirements
@@ -1618,11 +1624,17 @@ def main():
                             api_key=st.secrets["OPENROUTER_API_KEY"],
                             prompt_templates=st.session_state.prompt_templates
                         )
-                        
+                        document_content_simple = ""
+                        if st.session_state.simplifier_result == None:
+                            document_content_simple = st.session_state.document_content
+                            st.write("使用原始素材表进行分析")
+                        else:
+                            document_content_simple = st.session_state.simplifier_result
+                            st.write("使用简化后素材表进行分析")
                         with st.spinner("正在规划内容..."):
                             creator_result = agent.process_creator(
                                 strategist_analysis=st.session_state.strategist_analysis_result,
-                                document_content=st.session_state.document_content,
+                                document_content_simple = document_content_simple,
                                 school_plan=school_plan,
                                 transcript_analysis=st.session_state.transcript_analysis_result,
                                 custom_requirements=custom_requirements
