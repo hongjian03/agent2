@@ -486,7 +486,8 @@ class PromptTemplates:
             """,
             "material_simplifier_role": """
             你是一位优秀的素材简化专家。你的任务是分析学生提供的素材表，提取其中最有价值、最相关的信息，形成一个简化版本。
-            "material_simplifier_tesk"
+            """,
+            "material_simplifier_tesk": """
             请关注：
             1. 学生的核心成就和经历
             2. 能体现学生特点和优势的关键信息
@@ -497,8 +498,9 @@ class PromptTemplates:
             1. 过于冗长的描述和不必要的细节
             2. 重复信息
             3. 与申请关系不大的内容
+            """,
 
-            "material_simplifier_output"
+            "material_simplifier_output":"""
             请提供一个精简的、结构清晰的素材表摘要，保留所有关键信息。
             """
         }
