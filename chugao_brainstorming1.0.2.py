@@ -1662,6 +1662,27 @@ def main():
         
         prompt_templates = st.session_state.prompt_templates
         
+        #素材表简化提示词
+        st.subheader("素材表简化")
+        consultant_role_simplifier = st.text_area(
+            "角色设定",
+            value=prompt_templates.get_template('consultant_role_simplifier'),
+            height=200,
+            key="consultant_role_simplifier"
+        )
+        consultant_task_simplifier = st.text_area(
+            "任务说明",
+            value=prompt_templates.get_template('consultant_task_simplifier'),
+            height=200,
+            key="consultant_task_simplifier"
+        )
+        output_format_simplifier = st.text_area(
+            "输出格式",
+            value=prompt_templates.get_template('output_format_simplifier'),
+            height=200,
+            key="output_format_simplifier"
+        )
+        
         # Agent 1 设置
         st.subheader("Agent 1 - 档案策略师")
         consultant_role1 = st.text_area(
@@ -1710,6 +1731,9 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
+                prompt_templates.update_template('consultant_role_simplifier', consultant_role_simplifier)
+                prompt_templates.update_template('consultant_task_simplifier', consultant_task_simplifier)
+                prompt_templates.update_template('output_format_simplifier', output_format_simplifier)
                 prompt_templates.update_template('consultant_role1', consultant_role1)
                 prompt_templates.update_template('output_format1', output_format1)
                 prompt_templates.update_template('consultant_task1', consultant_task1)
