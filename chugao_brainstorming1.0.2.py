@@ -1442,7 +1442,7 @@ def main():
                 st.session_state.simplifier_analysis_done = False
                 st.rerun()
         if st.session_state.show_simplifier_analysis:
-            with st.expander("简化后的素材表", expanded=True):
+            with st.container():
                 st.markdown("---")
                 st.subheader("📊 简化后的素材表")
                 
