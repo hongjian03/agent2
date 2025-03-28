@@ -1666,21 +1666,21 @@ def main():
         st.subheader("素材表简化")
         consultant_role_simplifier = st.text_area(
             "角色设定",
-            value=prompt_templates.get_template('consultant_role_simplifier'),
+            value=prompt_templates.get_template('material_simplifier_role'),
             height=200,
-            key="consultant_role_simplifier"
+            key="material_simplifier_role"
         )
         consultant_task_simplifier = st.text_area(
             "任务说明",
-            value=prompt_templates.get_template('consultant_task_simplifier'),
+            value=prompt_templates.get_template('material_simplifier_task'),
             height=200,
-            key="consultant_task_simplifier"
+            key="material_simplifier_task"
         )
         output_format_simplifier = st.text_area(
             "输出格式",
-            value=prompt_templates.get_template('output_format_simplifier'),
+            value=prompt_templates.get_template('material_simplifier_output_format'),
             height=200,
-            key="output_format_simplifier"
+            key="material_simplifier_output_format"
         )
         
         # Agent 1 设置
