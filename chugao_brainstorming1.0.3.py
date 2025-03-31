@@ -1607,7 +1607,6 @@ def main():
                                 st.session_state.strategist_analysis_result = result["strategist_analysis"]
                                 st.session_state.strategist_analysis_done = True
                                 st.success("✅ 背景分析完成！")
-                                st.rerun()
                             else:
                                 st.error(f"背景分析出错: {result['message']}")
                     except Exception as e:
