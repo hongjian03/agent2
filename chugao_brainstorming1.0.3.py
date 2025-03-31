@@ -885,7 +885,6 @@ class BrainstormingAgent:
             
             # 清空原容器并使用markdown重新渲染完整响应
             if full_response:
-                st.write("重新渲染")
                 output_container.empty()
                 new_container = st.container()
                 with new_container:
@@ -1604,9 +1603,9 @@ def main():
                             
                             if result["status"] == "success":
                                 st.session_state.strategist_analysis_result = result["strategist_analysis"]
-                                st.markdown(st.session_state.strategist_analysis_result, unsafe_allow_html=True)
                                 st.session_state.strategist_analysis_done = True
                                 st.success("✅ 背景分析完成！")
+                                st.rerun()
                             else:
                                 st.error(f"背景分析出错: {result['message']}")
                     except Exception as e:
