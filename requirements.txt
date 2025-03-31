@@ -16,4 +16,4 @@ supabase
 transformers
 sentence-transformers
 faiss-cpu
-markitdown
+markitdown[docx]
