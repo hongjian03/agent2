@@ -71,7 +71,8 @@ class PromptTemplates:
             """,
             
             'output_format1': """
-            输出格式
+            输出格式：
+            输出内容为字符串，不是代码块，开头严禁添加“```markdown”
             必须完整分析并输出所有识别出的专业方向（最多2个），每个方向的分析必须包含以下内容：
             
             个人陈述初稿写作策略报告
@@ -414,7 +415,8 @@ class PromptTemplates:
             """,
             
             'output_format2': """
-            输出格式
+            输出格式：
+            输出内容为字符串，不是代码块，开头严禁添加“```markdown”
             个人陈述（专业大类1：[专业名称]）
             专业兴趣塑造 [按照分析报告中的段落素材策略与增强指南组织内容，注重逻辑性，并且深入展开细节描述和观点叙述，减少素材的堆砌，注重描述的深度...] 
             学术基础展示 [按照分析报告中的段落素材策略与增强指南组织内容，突出相关课程的学习成果和技能提升，体现与该专业方向的契合...] 
@@ -1611,11 +1613,8 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    result1= st.session_state.strategist_analysis_result
-                    result1 = "1"+result1
                     # 使用markdown方法并明确指定unsafe_allow_html参数
-                    st.write("用markdown显示：")
-                    st.markdown(result1, unsafe_allow_html=True)
+                    st.markdown(st.session_state.strategist_analysis_result, unsafe_allow_html=True)
                     st.success("✅ 背景分析完成！")
         
         # 修改内容规划显示，只保留单文档逻辑
