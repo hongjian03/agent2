@@ -1065,7 +1065,8 @@ def main():
             st.session_state.transcript_analysis_result = None
             st.session_state.show_transcript_analysis = False
         
-        uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
+        st.markdown("上传初稿文档 <span style='color: red'>*</span>", unsafe_allow_html=True)
+        uploaded_file = st.file_uploader("", type=['docx'])  # 标签设为空，因为我们已经用markdown显示了标签
         # 处理上传的文件
         if uploaded_file:
             try:
@@ -1143,12 +1144,13 @@ def main():
                         # 如果已经完成，直接显示结果
                         st.markdown(st.session_state.simplifier_result)
                         st.success("✅ 简化素材表完成！")
-        # 添加选校方案输入框
+        # 修改申请方向部分
+        st.markdown("申请方向 <span style='color: red'>*</span>", unsafe_allow_html=True)
         school_plan = st.text_area(
-            "选校方案",
-            value="暂未选校",
+            "",  # 标签设为空，因为我们已经用markdown显示了标签
+            value="请输入申请方向，此为必填项",
             height=100,
-            help="请输入已确定的选校方案，包括学校和专业信息"
+            help="请输入已确定的申请方向"
         )
         
         # 添加自定义需求输入框
