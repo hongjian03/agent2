@@ -72,7 +72,7 @@ class PromptTemplates:
             
             'output_format1': """
             输出格式：
-            输出内容为字符串，不是代码块，开头严禁添加“```markdown”
+            输出内容为字符串，不是代码块，开头严禁添加"```markdown"
             必须完整分析并输出所有识别出的专业方向（最多2个），每个方向的分析必须包含以下内容：
             
             个人陈述初稿写作策略报告
@@ -416,7 +416,7 @@ class PromptTemplates:
             
             'output_format2': """
             输出格式：
-            输出内容为字符串，不是代码块，开头严禁添加“```markdown”
+            输出内容为字符串，不是代码块，开头严禁添加"```markdown"
             个人陈述（专业大类1：[专业名称]）
             专业兴趣塑造 [按照分析报告中的段落素材策略与增强指南组织内容，注重逻辑性，并且深入展开细节描述和观点叙述，减少素材的堆砌，注重描述的深度...] 
             学术基础展示 [按照分析报告中的段落素材策略与增强指南组织内容，突出相关课程的学习成果和技能提升，体现与该专业方向的契合...] 
@@ -751,6 +751,13 @@ class TranscriptAnalyzer:
                 
                 # 清空原容器并使用markdown重新渲染完整响应
                 if full_response:
+                # 处理可能存在的markdown代码块标记
+                    if full_response.startswith("```markdown"):
+                        # 移除开头的```markdown和结尾的```
+                        full_response = full_response.replace("```markdown", "", 1)
+                        if full_response.endswith("```"):
+                            full_response = full_response[:-3]
+                    
                     output_container.empty()
                     new_container = st.container()
                     with new_container:
@@ -763,9 +770,16 @@ class TranscriptAnalyzer:
                 logger.info("simplifier_result completed successfully")
                 
                 # 从 full_response 中提取分析结果
+                processed_response = full_response
+                if processed_response.startswith("```markdown"):
+                    # 移除开头的```markdown和结尾的```
+                    processed_response = processed_response.replace("```markdown", "", 1)
+                    if processed_response.endswith("```"):
+                        processed_response = processed_response[:-3]
+                # 从 full_response 中提取分析结果
                 return {
                     "status": "success",
-                    "simplifier_result": full_response
+                    "simplifier_result": processed_response
                 }
                     
         except Exception as e:
@@ -887,6 +901,13 @@ class BrainstormingAgent:
             
             # 清空原容器并使用markdown重新渲染完整响应
             if full_response:
+                # 处理可能存在的markdown代码块标记
+                if full_response.startswith("```markdown"):
+                    # 移除开头的```markdown和结尾的```
+                    full_response = full_response.replace("```markdown", "", 1)
+                    if full_response.endswith("```"):
+                        full_response = full_response[:-3]
+                
                 output_container.empty()
                 new_container = st.container()
                 with new_container:
@@ -899,9 +920,16 @@ class BrainstormingAgent:
             logger.info("Strategist analysis completed successfully")
             
             # 从 full_response 中提取分析结果
+            processed_response = full_response
+            if processed_response.startswith("```markdown"):
+                # 移除开头的```markdown和结尾的```
+                processed_response = processed_response.replace("```markdown", "", 1)
+                if processed_response.endswith("```"):
+                    processed_response = processed_response[:-3]
+
             return {
                 "status": "success",
-                "strategist_analysis": full_response
+                "strategist_analysis": processed_response
             }
                 
         except Exception as e:
@@ -971,6 +999,13 @@ class BrainstormingAgent:
             thread.join()
             # 清空原容器并使用markdown重新渲染完整响应
             if full_response:
+                # 处理可能存在的markdown代码块标记
+                if full_response.startswith("```markdown"):
+                    # 移除开头的```markdown和结尾的```
+                    full_response = full_response.replace("```markdown", "", 1)
+                    if full_response.endswith("```"):
+                        full_response = full_response[:-3]
+                
                 output_container.empty()
                 new_container = st.container()
                 with new_container:
@@ -980,10 +1015,16 @@ class BrainstormingAgent:
                 raise thread._exception
             
             logger.info("Creator analysis completed successfully")
-            
+            processed_response = full_response
+            if processed_response.startswith("```markdown"):
+                # 移除开头的```markdown和结尾的```
+                processed_response = processed_response.replace("```markdown", "", 1)
+                if processed_response.endswith("```"):
+                    processed_response = processed_response[:-3]
+
             return {
                 "status": "success",
-                "creator_output": full_response
+                "creator_output": processed_response
             }
                 
         except Exception as e:
@@ -1638,7 +1679,7 @@ def main():
                         with st.spinner("正在规划内容..."):
                             creator_result = agent.process_creator(
                                 strategist_analysis=st.session_state.strategist_analysis_result,
-                                document_content_simple = document_content_simple,
+                                document_content = document_content_simple,
                                 school_plan=school_plan,
                                 transcript_analysis=st.session_state.transcript_analysis_result,
                                 custom_requirements=custom_requirements
