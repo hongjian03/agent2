@@ -1679,7 +1679,7 @@ def main():
                         with st.spinner("正在规划内容..."):
                             creator_result = agent.process_creator(
                                 strategist_analysis=st.session_state.strategist_analysis_result,
-                                document_content_simple = document_content_simple,
+                                document_content = document_content_simple,
                                 school_plan=school_plan,
                                 transcript_analysis=st.session_state.transcript_analysis_result,
                                 custom_requirements=custom_requirements
