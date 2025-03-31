@@ -251,7 +251,7 @@ class PromptTemplates:
             - 违反上述规则将导致文书真实性严重受损，必须严格遵守
             13.完成输出后不得增加任何总结性语句或询问用户是否满意的内容
             14.不得在格式中添加或修改任何标题、副标题或其他未在上述格式中明确列出的内容
-            15.以markdown形式输出，确保经过markdown渲染后可以正确清晰的显示
+            15.以markdown形式输出，确保经过markdown渲染后可以正确清晰的显示，严禁添加"```markdown"
 
             输出时必须严格使用以下markdown格式：
             1. 每个#符号前不要有空格，确保是行首第一个字符
@@ -1519,9 +1519,10 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    # 如果已经完成，直接显示结果
-                    st.markdown(st.session_state.simplifier_result)
-                    st.success("✅ 简化素材表完成！")
+                    with st.expander("查看简化后的素材表", expanded=False):
+                        # 如果已经完成，直接显示结果
+                        st.markdown(st.session_state.simplifier_result)
+                        st.success("✅ 简化素材表完成！")
         # 添加选校方案输入框
         school_plan = st.text_area(
             "选校方案",
