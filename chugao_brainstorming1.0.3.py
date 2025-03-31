@@ -1351,7 +1351,7 @@ def main():
                     st.success("✅ 内容规划完成！")
             # 修改模型信息显示
         st.markdown(f"<div class='model-info'>🤖 图像分析当前使用模型: <b>{st.session_state.transcript_model}</b></div>", unsafe_allow_html=True)
-        st.markdown(f"<div class='model-info'>🤖 内容规划当前使用模型: <b>{st.session_state.text_model}</b></div>", unsafe_allow_html=True)
+        st.markdown(f"<div class='model-info'>🤖 内容规划当前使用模型: <b>{st.session_state.content_model}</b></div>", unsafe_allow_html=True)
         
     
     with tab2:
