@@ -1068,6 +1068,7 @@ def main():
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
         # 处理上传的文件
         if uploaded_file:
+            st.write("123")
             try:
                 # 检查是否需要重新处理（新上传的文件或者更改了文件）
                 if 'last_uploaded_file' not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
@@ -1081,7 +1082,6 @@ def main():
                     raw_content = md.convert(file_stream)
                     
                     if raw_content:
-                        # 保存原始内容用于后续分析
                         st.session_state.document_content = raw_content
                         # 显示处理结果
                         with st.expander("查看Markitdown处理结果", expanded=False):
@@ -1096,6 +1096,7 @@ def main():
             except Exception as e:
                 st.error(f"处理文件时出错: {str(e)}")
         else:
+            st.write("456")
             # 文件被移除，清除相关状态
             if 'last_uploaded_file' in st.session_state:
                 del st.session_state.last_uploaded_file
