@@ -1068,35 +1068,34 @@ def main():
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
         # 处理上传的文件
         if uploaded_file:
-            st.write("123")
             try:
-                # 检查是否需要重新处理（新上传的文件或者更改了文件）
-                if 'last_uploaded_file' not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
-                    st.session_state.last_uploaded_file = uploaded_file.name
-                    
-                    # 文件处理逻辑
-                    file_bytes = uploaded_file.read()
-                    file_stream = io.BytesIO(file_bytes)
-                    
-                    md = MarkItDown()
-                    raw_content = md.convert(file_stream)
-                    
-                    if raw_content:
-                        st.session_state.document_content = raw_content
-                        # 显示处理结果
-                        with st.expander("查看Markitdown处理结果", expanded=False):
-                            st.markdown(raw_content, unsafe_allow_html=True)
-                        
-                        # 自动开始简化素材表
-                        st.session_state.show_simplifier_analysis = True
-                        st.session_state.simplifier_analysis_done = False
-                        st.rerun()  # 触发重新运行以开始简化
-                    else:
-                        st.error("无法读取文件，请检查格式是否正确。")
+                file_bytes = uploaded_file.read()
+                # 将 bytes 转换为 BytesIO 对象，这是一个 BinaryIO 类型
+                file_stream = io.BytesIO(file_bytes)
+                
+                md = MarkItDown()
+                # 传递 file_stream 而不是原始字节
+                raw_content = md.convert(file_stream)
+                
+                if raw_content:
+                    # 保存原始内容用于后续分析
+                    st.session_state.document_content = raw_content
+                    # 显示处理结果
+                    with st.expander("查看Markitdown处理结果", expanded=False):
+                        st.markdown(raw_content, unsafe_allow_html=True)
+                else:
+                    st.error("无法读取文件，请检查格式是否正确。")
             except Exception as e:
                 st.error(f"处理文件时出错: {str(e)}")
+        if uploaded_file:
+            if 'last_uploaded_file' not in st.session_state or st.session_state.last_uploaded_file != uploaded_file.name:
+                st.session_state.last_uploaded_file = uploaded_file.name
+                # 自动开始简化素材表
+                st.session_state.show_simplifier_analysis = True
+                st.session_state.simplifier_analysis_done = False
+                st.rerun()  # 触发重新运行以开始简化
+
         else:
-            st.write("456")
             # 文件被移除，清除相关状态
             if 'last_uploaded_file' in st.session_state:
                 del st.session_state.last_uploaded_file
@@ -1105,6 +1104,45 @@ def main():
             st.session_state.simplifier_analysis_done = False
             st.session_state.simplifier_result = None
         
+
+            
+        if st.session_state.show_simplifier_analysis:
+            with st.container():
+                st.markdown("---")
+                st.subheader("📊 简化后的素材表")
+                
+                if not st.session_state.simplifier_analysis_done:
+                    try:
+                        # 确保 prompt_templates 存在
+                        if 'prompt_templates' not in st.session_state:
+                            st.session_state.prompt_templates = PromptTemplates()
+                        
+                        transcript_analyzer = TranscriptAnalyzer(
+                            api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
+                            prompt_templates=st.session_state.prompt_templates
+                        )
+                        
+                        with st.spinner("正在简化素材表..."):
+                            # 处理成绩单分析
+                            result = transcript_analyzer.simplify_materials(
+                                st.session_state.document_content
+                            )
+                            
+                            if result["status"] == "success":
+                                # 保存成绩单分析结果到 session_state
+                                st.session_state.simplifier_result = result["simplifier_result"]
+                                st.session_state.simplifier_analysis_done = True
+                                st.success("✅ 简化素材表完成！")
+                            else:
+                                st.error(f"简化素材表出错: {result['message']}")
+                    
+                    except Exception as e:
+                        st.error(f"处理过程中出错: {str(e)}")
+                else:
+                    with st.expander("查看简化后的素材表", expanded=False):
+                        # 如果已经完成，直接显示结果
+                        st.markdown(st.session_state.simplifier_result)
+                        st.success("✅ 简化素材表完成！")
         # 添加选校方案输入框
         school_plan = st.text_area(
             "选校方案",
