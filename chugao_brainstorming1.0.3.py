@@ -1066,19 +1066,21 @@ def main():
         
         
         uploaded_file = st.file_uploader("上传初稿文档", type=['docx'])  # 改为单文件上传
-        
         # 处理上传的文件
         if uploaded_file:
-            md = MarkItDown()
-            raw_content = md.convert(uploaded_file.read())
-            if raw_content:
-                # 保存原始内容用于后续分析
-                st.session_state.document_content = raw_content
-                # 显示处理结果
-                with st.expander("查看Markitdown处理结果", expanded=False):
-                    st.markdown(raw_content, unsafe_allow_html=True)
-            else:
-                st.error("无法读取文件，请检查格式是否正确。")
+            try:
+                md = MarkItDown()
+                raw_content = md.convert(uploaded_file.read())
+                if raw_content:
+                    # 保存原始内容用于后续分析
+                    st.session_state.document_content = raw_content
+                    # 显示处理结果
+                    with st.expander("查看Markitdown处理结果", expanded=False):
+                        st.markdown(raw_content, unsafe_allow_html=True)
+                else:
+                    st.error("无法读取文件，请检查格式是否正确。")
+            except Exception as e:
+                st.error(f"处理文件时出错: {str(e)}")
         
         if st.button("简化素材表", key="simplify_materials", use_container_width=True):
             if st.session_state.document_content:
