@@ -527,7 +527,7 @@ class TranscriptAnalyzer:
             st.session_state.templates = self.prompt_templates.default_templates.copy()
             
         self.llm = ChatOpenAI(
-            temperature=0.2,
+            temperature=0.1,
             model=st.session_state.transcript_model,  # 使用session state中的模型
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
@@ -536,7 +536,7 @@ class TranscriptAnalyzer:
         
         # 添加材料简化器LLM，使用成本较低的模型
         self.simplifier_llm = ChatOpenAI(
-            temperature=0.2,
+            temperature=0.1,
             model=st.session_state.simplifier_model,  # 使用session state中的简化器模型
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
@@ -792,7 +792,7 @@ class TranscriptAnalyzer:
 class BrainstormingAgent:
     def __init__(self, api_key: str, prompt_templates: PromptTemplates):
         self.llm = ChatOpenAI(
-            temperature=0.2,
+            temperature=0.1,
             model=st.session_state.text_model,  # 使用session state中的模型
             api_key=api_key,
             base_url="https://openrouter.ai/api/v1",
