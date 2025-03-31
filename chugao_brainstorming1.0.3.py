@@ -1174,16 +1174,11 @@ def main():
                 st.session_state.creator_analysis_done = False
                 st.rerun()
         with button_col2:
-            if st.button("清除所有分析", key="clear_analysis", use_container_width=True):
+            if st.button("清除内容规划", key="clear_analysis", use_container_width=True):
                 # 清除所有分析相关的session状态
-                st.session_state.document_content = None
-                st.session_state.strategist_analysis_done = False
                 st.session_state.creator_analysis_done = False
-                st.session_state.show_strategist_analysis = False
                 st.session_state.show_creator_analysis = False
-                st.session_state.show_simplifier_analysis = False
-                st.session_state.simplifier_analysis_done = False
-                st.success("✅ 所有分析结果已清除！")
+                st.success("✅ 内容规划结果已清除！")
                 st.rerun()
         # 修改结果显示区域，只保留单文档逻辑
         results_container = st.container()
