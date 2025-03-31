@@ -1612,9 +1612,8 @@ def main():
                     except Exception as e:
                         st.error(f"处理过程中出错: {str(e)}")
                 else:
-                    st.write("保存为result1")
                     result1= st.session_state.strategist_analysis_result
-                    result1 = "使用markdown显示1"+result1
+                    result1 = "1"+result1
                     # 使用markdown方法并明确指定unsafe_allow_html参数
                     st.write("用markdown显示：")
                     st.markdown(result1, unsafe_allow_html=True)
