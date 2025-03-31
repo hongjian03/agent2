@@ -573,7 +573,7 @@ class BrainstormingAgent:
         self.prompt_templates = prompt_templates
         self.setup_chains()
 
-        # 内容规划 Chain 
+    def setup_chains(self):        # 内容规划 Chain 
         creator_prompt = ChatPromptTemplate.from_messages([
             ("system", f"{self.prompt_templates.get_template('consultant_role2')}\n\n"
                       f"任务:\n{self.prompt_templates.get_template('consultant_task2')}\n\n"
