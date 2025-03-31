@@ -1614,7 +1614,8 @@ def main():
                 else:
                     # 使用markdown方法并明确指定unsafe_allow_html参数
                     st.write("用markdown显示：")
-                    st.markdown(st.session_state.strategist_analysis_result, unsafe_allow_html=True)
+                    result1= st.session_state.strategist_analysis_result
+                    st.markdown(result1, unsafe_allow_html=True)
                     st.success("✅ 背景分析完成！")
         
         # 修改内容规划显示，只保留单文档逻辑
