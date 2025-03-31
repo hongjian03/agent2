@@ -1069,8 +1069,14 @@ def main():
         # 处理上传的文件
         if uploaded_file:
             try:
+                file_bytes = uploaded_file.read()
+                # 将 bytes 转换为 BytesIO 对象，这是一个 BinaryIO 类型
+                file_stream = io.BytesIO(file_bytes)
+                
                 md = MarkItDown()
-                raw_content = md.convert(uploaded_file.read())
+                # 传递 file_stream 而不是原始字节
+                raw_content = md.convert(file_stream)
+                
                 if raw_content:
                     # 保存原始内容用于后续分析
                     st.session_state.document_content = raw_content
