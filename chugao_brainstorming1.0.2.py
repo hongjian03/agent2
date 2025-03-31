@@ -1710,19 +1710,19 @@ def main():
         
         #素材表简化提示词
         st.subheader("素材表简化")
-        consultant_role_simplifier = st.text_area(
+        material_simplifier_role = st.text_area(
             "角色设定",
             value=prompt_templates.get_template('material_simplifier_role'),
             height=200,
             key="material_simplifier_role"
         )
-        consultant_task_simplifier = st.text_area(
+        material_simplifier_task = st.text_area(
             "任务说明",
             value=prompt_templates.get_template('material_simplifier_task'),
             height=200,
             key="material_simplifier_task"
         )
-        output_format_simplifier = st.text_area(
+        material_simplifier_output = st.text_area(
             "输出格式",
             value=prompt_templates.get_template('material_simplifier_output'),
             height=200,
@@ -1777,9 +1777,9 @@ def main():
         col1, col2 = st.columns(2)
         with col1:
             if st.button("更新提示词", key="update_prompts"):
-                prompt_templates.update_template('consultant_role_simplifier', consultant_role_simplifier)
-                prompt_templates.update_template('consultant_task_simplifier', consultant_task_simplifier)
-                prompt_templates.update_template('output_format_simplifier', output_format_simplifier)
+                prompt_templates.update_template('material_simplifier_role', material_simplifier_role)
+                prompt_templates.update_template('material_simplifier_task', material_simplifier_task)
+                prompt_templates.update_template('material_simplifier_output', material_simplifier_output)
                 prompt_templates.update_template('consultant_role1', consultant_role1)
                 prompt_templates.update_template('output_format1', output_format1)
                 prompt_templates.update_template('consultant_task1', consultant_task1)
