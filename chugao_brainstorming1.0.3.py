@@ -30,7 +30,7 @@ import time
 from queue import Empty
 logger = logging.getLogger(__name__)
 from langchain.callbacks.base import BaseCallbackHandler
-import markitdown
+from markitdown import MarkItDown
 
 # 记录程序启动
 logger.info("程序开始运行")
@@ -895,100 +895,6 @@ def add_custom_css():
     """, unsafe_allow_html=True)
 
 
-def process_document_with_markitdown(content):
-    """使用Markitdown处理文档内容"""
-    try:
-        # 配置Markitdown
-        return markitdown.convert(content, extensions=[
-            'extra',      # 包含tables, attr_list, footnotes等
-            'codehilite', # 代码高亮
-            'toc',        # 目录生成
-            'smarty',     # 智能标点
-            'sane_lists'  # 更好的列表处理
-        ], extension_configs={
-            'codehilite': {
-                'linenums': False,
-                'css_class': 'highlight'
-            },
-            'toc': {
-                'permalink': True,
-                'title': '目录'
-            }
-        })
-    except Exception as e:
-        logger.error(f"使用Markitdown处理内容时出错: {str(e)}")
-        return content  # 出错时返回原始内容
-
-def read_docx(file_bytes):
-    """读取 Word 文档内容，包括表格，使用markitdown处理后返回"""
-    try:
-        doc = Document(io.BytesIO(file_bytes))
-        content_set = set()  # 用于存储已处理的内容，避免重复
-        full_text = []
-        
-        # 读取普通段落
-        for paragraph in doc.paragraphs:
-            text = paragraph.text.strip()
-            if text and text not in content_set:  # 只添加非空且未重复的内容
-                content_set.add(text)
-                full_text.append(text)
-        
-        # 读取表格内容
-        for table in doc.tables:
-            md_table = convert_table_to_markdown(table)
-            if md_table:
-                full_text.append(md_table)
-        
-        # 使用换行符连接所有文本，创建完整的Markdown文本
-        raw_markdown = "\n\n".join(full_text)
-        
-        # 使用markitdown处理提取的内容
-        processed_content = process_document_with_markitdown(raw_markdown)
-        
-        logger.info(f"成功读取文档内容，使用Markitdown处理完成，包含 {len(doc.tables)} 个表格")
-        
-        # 返回原始提取文本和处理后的HTML内容
-        return {
-            'raw_content': raw_markdown,
-            'html_content': processed_content
-        }
-    except Exception as e:
-        logger.error(f"读取 Word 文档时出错: {str(e)}")
-        return None
-
-def convert_table_to_markdown(table):
-    """将Word表格转换为Markdown表格格式"""
-    if not table.rows:
-        return ""
-    
-    md_table = []
-    header = []
-    
-    # 获取表头
-    for cell in table.rows[0].cells:
-        header.append(cell.text.strip())
-    
-    if not header:
-        return ""
-    
-    # 添加表头行
-    md_table.append("| " + " | ".join(header) + " |")
-    
-    # 添加分隔行
-    md_table.append("| " + " | ".join(["---" for _ in header]) + " |")
-    
-    # 添加数据行
-    for row in table.rows[1:]:
-        cells = [cell.text.strip() for cell in row.cells]
-        if any(cells):  # 确保行不是空的
-            # 确保单元格数量与表头一致
-            while len(cells) < len(header):
-                cells.append("")
-            cells = cells[:len(header)]  # 截断多余的单元格
-            md_table.append("| " + " | ".join(cells) + " |")
-    
-    return "\n".join(md_table)
-
 def initialize_session_state():
     if 'templates' not in st.session_state:
         prompt_templates = PromptTemplates()
@@ -1163,25 +1069,14 @@ def main():
         
         # 处理上传的文件
         if uploaded_file:
-            raw_content = read_docx(uploaded_file.read())
+            md = MarkItDown()
+            raw_content = md.convert(uploaded_file.read())
             if raw_content:
-                # 使用Markitdown处理内容
-                html_content = process_document_with_markitdown(raw_content['raw_content'])
-                
                 # 保存原始内容用于后续分析
-                st.session_state.document_content = raw_content['raw_content']
-                
-                # 保存处理后的HTML内容，如果需要展示
-                st.session_state.document_html = html_content
-                
-                st.success(f"文件上传并处理成功！")
-                
+                st.session_state.document_content = raw_content
                 # 显示处理结果
                 with st.expander("查看Markitdown处理结果", expanded=False):
-                    st.markdown(html_content, unsafe_allow_html=True)
-                    
-                with st.expander("查看原始提取内容", expanded=False):
-                    st.write(raw_content['raw_content'])
+                    st.markdown(raw_content, unsafe_allow_html=True)
             else:
                 st.error("无法读取文件，请检查格式是否正确。")
         
