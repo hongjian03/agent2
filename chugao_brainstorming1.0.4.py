@@ -1085,6 +1085,8 @@ def main():
         st.session_state.transcript_analysis_done = False
         st.session_state.transcript_analysis_result = None
         st.session_state.show_transcript_analysis = False
+        # 强制重新运行以清除界面上的分析结果
+        st.rerun()
     
     st.markdown("上传初稿文档 <span style='color: red'>*</span>", unsafe_allow_html=True)
     uploaded_file = st.file_uploader("", type=['docx'])  # 标签设为空，因为我们已经用markdown显示了标签
