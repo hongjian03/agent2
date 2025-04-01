@@ -1013,7 +1013,7 @@ def main():
     
     
     transcript_files = st.file_uploader("上传成绩单（可选，支持多个文件）", 
-                                       type=['pdf', 'jpg', 'jpeg', 'png'], 
+                                       type=['jpg', 'pdf', 'jpeg', 'png'], 
                                        accept_multiple_files=True)
     # 自动检查文件状态并清除相关内存或自动开始分析
     if transcript_files:
