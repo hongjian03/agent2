@@ -346,34 +346,73 @@ class TranscriptAnalyzer:
             logger.error(f"提取PDF图像时出错: {str(e)}")
             return []
     
-    def analyze_transcript(self, pdf_bytes) -> Dict[str, Any]:
+    def analyze_transcripts(self, files) -> Dict[str, Any]:
         try:
             if not hasattr(self, 'prompt_templates'):
                 logger.error("prompt_templates not initialized")
                 raise ValueError("Prompt templates not initialized properly")
             
-            images = self.extract_images_from_pdf(pdf_bytes)
-            if not images:
+            all_images = []
+            
+            # 处理每个文件并提取图像
+            for file in files:
+                file_bytes = file.read()
+                file_extension = file.name.split('.')[-1].lower()
+                
+                if file_extension in ['jpg', 'jpeg', 'png']:
+                    # 直接处理图片文件
+                    try:
+                        img_base64 = base64.b64encode(file_bytes).decode('utf-8')
+                        all_images.append({
+                            "type": f"image/{file_extension}",
+                            "data": img_base64,
+                            "name": file.name
+                        })
+                    except Exception as e:
+                        logger.error(f"处理图片文件时出错 {file.name}: {str(e)}")
+                else:
+                    # 处理PDF文件
+                    try:
+                        pdf_images = self.extract_images_from_pdf(file_bytes)
+                        for i, img_base64 in enumerate(pdf_images):
+                            all_images.append({
+                                "type": "image/png",
+                                "data": img_base64,
+                                "name": f"{file.name}_page{i+1}"
+                            })
+                    except Exception as e:
+                        logger.error(f"提取PDF图像时出错 {file.name}: {str(e)}")
+                
+                # 重置文件指针，以便后续可能的操作
+                file.seek(0)
+            
+            if not all_images:
                 return {
                     "status": "error",
-                    "message": "无法从PDF中提取图像"
+                    "message": "无法从任何文件中提取图像"
                 }
+            
+            # 创建人类提示消息列表
+            human_message_content = [
+                {
+                    "type": "text",
+                    "text": f"\n\n我提供了{len(all_images)}张成绩单图片，请分析所有这些成绩单，提取关键信息并以表格形式输出成绩信息。如果有多种类型的成绩单（如GPA、语言考试等），请分别进行分析并分别列表。"
+                }
+            ]
+            
+            # 添加所有图像到消息内容
+            for img in all_images:
+                human_message_content.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:{img['type']};base64,{img['data']}"
+                    }
+                })
             
             # 修改消息格式
             messages = [
                 SystemMessage(content=self.prompt_templates.get_template('transcript_role')),
-                HumanMessage(content=[  # 注意这里改成了列表
-                    {
-                        "type": "text",
-                        "text": f"\n\n请分析这份成绩单，提取成绩信息，并以表格形式输出成绩信息。"
-                    },
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{images[0]}"
-                        }
-                    }
-                ])
+                HumanMessage(content=human_message_content)
             ]
             
             # 创建一个队列用于流式输出
@@ -945,8 +984,8 @@ def main():
     # 初始化会话状态变量
     if 'document_content' not in st.session_state:
         st.session_state.document_content = None
-    if 'transcript_file' not in st.session_state:
-        st.session_state.transcript_file = None
+    if 'transcript_files' not in st.session_state:
+        st.session_state.transcript_files = None
     if 'transcript_analysis_done' not in st.session_state:
         st.session_state.transcript_analysis_done = False
     if 'transcript_analysis_result' not in st.session_state:
@@ -973,21 +1012,26 @@ def main():
         st.session_state.simplifier_result = None
     
     
-    transcript_file = st.file_uploader("上传成绩单（可选）", type=['pdf'])
+    transcript_files = st.file_uploader("上传成绩单（可选，支持多个文件）", 
+                                       type=['pdf', 'jpg', 'jpeg', 'png'], 
+                                       accept_multiple_files=True)
     # 自动检查文件状态并清除相关内存或自动开始分析
-    if transcript_file:
-        # 检查是否需要重新分析（新上传的文件或者更改了文件）
-        if 'last_transcript_file' not in st.session_state or st.session_state.last_transcript_file != transcript_file.name:
-            st.session_state.last_transcript_file = transcript_file.name
-            st.session_state.transcript_file = transcript_file
+    if transcript_files:
+        # 检查是否需要重新分析（新上传的文件或者文件列表发生变化）
+        current_files = [file.name for file in transcript_files]
+        current_files.sort()  # 排序确保列表顺序一致
+        
+        if 'last_transcript_files' not in st.session_state or st.session_state.last_transcript_files != current_files:
+            st.session_state.last_transcript_files = current_files
+            st.session_state.transcript_files = transcript_files
             st.session_state.show_transcript_analysis = True
             st.session_state.transcript_analysis_done = False
             st.rerun()  # 触发重新运行以开始分析
     else:
         # 文件被移除，清除相关状态
-        if 'last_transcript_file' in st.session_state:
-            del st.session_state.last_transcript_file
-        st.session_state.transcript_file = None
+        if 'last_transcript_files' in st.session_state:
+            del st.session_state.last_transcript_files
+        st.session_state.transcript_files = None
         st.session_state.transcript_analysis_done = False
         st.session_state.transcript_analysis_result = None
         st.session_state.show_transcript_analysis = False
@@ -1127,7 +1171,7 @@ def main():
     # 修改结果显示区域，只保留单文档逻辑
     results_container = st.container()
     
-    # 显示成绩单分析（保持不变）
+    # 显示成绩单分析
     if st.session_state.show_transcript_analysis:
         with results_container:
             st.markdown("---")
@@ -1140,14 +1184,14 @@ def main():
                         st.session_state.prompt_templates = PromptTemplates()
                     
                     transcript_analyzer = TranscriptAnalyzer(
-                        api_key=st.secrets["OPENROUTER_API_KEY"],  # 使用OpenRouter API密钥
+                        api_key=st.secrets["OPENROUTER_API_KEY"],
                         prompt_templates=st.session_state.prompt_templates
                     )
                     
                     with st.spinner("正在分析成绩单..."):
                         # 处理成绩单分析
-                        result = transcript_analyzer.analyze_transcript(
-                            st.session_state.transcript_file
+                        result = transcript_analyzer.analyze_transcripts(
+                            st.session_state.transcript_files
                         )
                         
                         if result["status"] == "success":
