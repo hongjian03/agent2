@@ -968,16 +968,55 @@ def verify_password():
     # 从secrets中获取正确的密码
     correct_password = st.secrets["APP_PASSWORD"]
     
-    st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
-    password = st.text_input("请输入访问密码", type="password")
+    # 添加登录页面的样式
+    st.markdown("""
+    <style>
+    .login-container {
+        max-width: 500px;
+        margin: 0 auto;
+        padding: 2rem;
+        background-color: white;
+        border-radius: 10px;
+        box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        margin-top: 3rem;
+    }
+    .login-title {
+        text-align: center;
+        margin-bottom: 2rem;
+        color: #1e3a8a;
+    }
+    .login-button {
+        background-color: #1e3a8a !important;
+        color: white !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
-    if password:
+    st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
+    
+    # 使用HTML创建居中的登录容器
+    st.markdown("<div class='login-container'>", unsafe_allow_html=True)
+    st.markdown("<h2 class='login-title'>系统登录</h2>", unsafe_allow_html=True)
+    
+    password = st.text_input("请输入访问密码", type="password", key="password_input")
+    login_button = st.button("登录系统", key="login_button", use_container_width=True)
+    
+    if login_button:
         if password == correct_password:
             st.session_state.password_verified = True
             st.success("密码验证成功！")
             st.rerun()
         else:
             st.error("密码错误，请重试！")
+    
+    # 也允许用户按回车键登录
+    if password and not login_button:
+        if password == correct_password:
+            st.session_state.password_verified = True
+            st.success("密码验证成功！")
+            st.rerun()
+    
+    st.markdown("</div>", unsafe_allow_html=True)
     
     return st.session_state.password_verified
 
