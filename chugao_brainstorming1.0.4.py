@@ -55,6 +55,7 @@ class PromptTemplates:
             'transcript_role': """
             # 角色
             你是专业的成绩单分析师，擅长从成绩单中提取关键信息并以表格形式展示成绩。
+            注意：可能会存在多张成绩单，这些成绩单都是同一个人的，你需要做到的只是提取他的成绩信息，不需要进行分析。
             """,
             
             'transcript_task': """
@@ -396,7 +397,13 @@ class TranscriptAnalyzer:
             human_message_content = [
                 {
                     "type": "text",
-                    "text": f"\n\n我提供了{len(all_images)}张成绩单图片，请分析所有这些成绩单，提取关键信息并以表格形式输出成绩信息。如果有多种类型的成绩单（如GPA、语言考试等），请分别进行分析并分别列表。"
+                    "text": f"""\n\n我提供了{len(all_images)}张成绩单图片，注意这些是同一个人的成绩单。
+                    可能是同一科成绩单，但因为太长所以分两张给你，也可能是不同科目的成绩单。
+                    你需要识别把同一张成绩单的信息放在同一张表格里面输出。
+                    不同的成绩单类型就比如雅思成绩单和绩点成绩单就是不同的类型，这种不同类型的成绩单要分成多个表格分别输出。
+                    注意你只是识别提取成绩信息，不对成绩信息做分析。
+                    注意不要泄露个人敏感信息。
+                    """
                 }
             ]
             
@@ -1015,13 +1022,25 @@ def main():
     transcript_files = st.file_uploader("上传成绩单（可选，支持多个文件）", 
                                        type=['jpg', 'pdf', 'jpeg', 'png'], 
                                        accept_multiple_files=True)
-    # 自动检查文件状态并清除相关内存或自动开始分析
+                                   
+    # 添加成绩单分析按钮
     if transcript_files:
-        # 检查是否需要重新分析（新上传的文件或者文件列表发生变化）
-        current_files = [file.name for file in transcript_files]
-        current_files.sort()  # 排序确保列表顺序一致
+        # 显示上传的文件列表
+        st.write(f"已上传 {len(transcript_files)} 个文件:")
+        for i, file in enumerate(transcript_files):
+            st.write(f"{i+1}. {file.name}")
         
-        if 'last_transcript_files' not in st.session_state or st.session_state.last_transcript_files != current_files:
+        analyze_transcript_button = st.button(
+            "开始分析成绩单", 
+            key="analyze_transcript_button",
+            use_container_width=True
+        )
+        
+        # 只有当用户点击按钮时才开始分析
+        if analyze_transcript_button:
+            # 保存文件列表到session state以便分析
+            current_files = [file.name for file in transcript_files]
+            current_files.sort()  # 排序确保列表顺序一致
             st.session_state.last_transcript_files = current_files
             st.session_state.transcript_files = transcript_files
             st.session_state.show_transcript_analysis = True
