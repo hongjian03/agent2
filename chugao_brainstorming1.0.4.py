@@ -959,9 +959,35 @@ def initialize_session_state():
     
     if 'prompt_templates' not in st.session_state:
         st.session_state.prompt_templates = PromptTemplates()
+    
+    # 添加密码验证状态
+    if 'password_verified' not in st.session_state:
+        st.session_state.password_verified = False
+
+def verify_password():
+    # 从secrets中获取正确的密码
+    correct_password = st.secrets["APP_PASSWORD"]
+    
+    st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
+    password = st.text_input("请输入访问密码", type="password")
+    
+    if password:
+        if password == correct_password:
+            st.session_state.password_verified = True
+            st.success("密码验证成功！")
+            st.rerun()
+        else:
+            st.error("密码错误，请重试！")
+    
+    return st.session_state.password_verified
 
 def main():
     initialize_session_state()
+    
+    # 如果密码未验证，显示密码输入界面
+    if not st.session_state.password_verified:
+        verify_password()
+        return  # 如果密码未验证，不继续执行后续代码
     
     langsmith_api_key = st.secrets["LANGCHAIN_API_KEY"]
     os.environ["LANGCHAIN_TRACING_V2"] = "true"
