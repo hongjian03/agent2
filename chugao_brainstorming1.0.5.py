@@ -985,9 +985,8 @@ def verify_password():
         margin-bottom: 2rem;
         color: #1e3a8a;
     }
-    .stButton > button {
-        background-color: #1e3a8a !important;
-        color: white !important;
+    .login-button {
+        margin-top: 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -1000,10 +999,8 @@ def verify_password():
     
     password = st.text_input("请输入访问密码", type="password", key="password_input")
     
-    # 确保按钮占满宽度并使用明确的样式
-    col1, col2, col3 = st.columns([1, 2, 1])
-    with col2:
-        login_button = st.button("登录系统", key="login_button", use_container_width=True)
+    # 直接使用按钮，不使用列布局
+    login_button = st.button("登录系统", key="login_button", use_container_width=True)
     
     if login_button:
         if password == correct_password:
