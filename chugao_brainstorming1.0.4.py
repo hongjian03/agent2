@@ -986,8 +986,7 @@ def verify_password():
         color: #1e3a8a;
     }
     .login-button {
-        background-color: #1e3a8a !important;
-        color: white !important;
+        margin-top: 1rem;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -995,10 +994,11 @@ def verify_password():
     st.markdown("<h1 class='page-title'>初稿脑暴助理</h1>", unsafe_allow_html=True)
     
     # 使用HTML创建居中的登录容器
-    st.markdown("<div class='login-container'>", unsafe_allow_html=True)
     st.markdown("<h2 class='login-title'>系统登录</h2>", unsafe_allow_html=True)
     
     password = st.text_input("请输入访问密码", type="password", key="password_input")
+    
+    # 直接使用按钮，不使用列布局
     login_button = st.button("登录系统", key="login_button", use_container_width=True)
     
     if login_button:
