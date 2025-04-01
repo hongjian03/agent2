@@ -468,32 +468,32 @@ class TranscriptAnalyzer:
             # 启动线程
             thread = Thread(target=run_analysis)
             thread.start()
-            
-            # 用于流式输出的容器
-            output_container = st.empty()
-            
-            # 流式输出
-            with output_container:
-                full_response = st.write_stream(token_generator())
-            
-            # 等待线程完成
-            thread.join()
-            
-            # 清空原容器并使用markdown重新渲染完整响应
-            if full_response:
-                output_container.empty()
-                output_container.markdown(full_response)
-            
-            # 获取结果
-            if hasattr(thread, "exception") and thread.exception:
-                raise thread.exception
-            
-            logger.info("成绩单分析完成")
-            
-            return {
-                "status": "success",
-                "transcript_analysis": full_response
-            }
+            with st.expander("成绩单分析识别", expanded=True):
+                # 用于流式输出的容器
+                output_container = st.empty()
+                
+                # 流式输出
+                with output_container:
+                    full_response = st.write_stream(token_generator())
+                
+                # 等待线程完成
+                thread.join()
+                
+                # 清空原容器并使用markdown重新渲染完整响应
+                if full_response:
+                    output_container.empty()
+                    output_container.markdown(full_response)
+                
+                # 获取结果
+                if hasattr(thread, "exception") and thread.exception:
+                    raise thread.exception
+                
+                logger.info("成绩单分析完成")
+                
+                return {
+                    "status": "success",
+                    "transcript_analysis": full_response
+                }
                 
         except Exception as e:
             logger.error(f"成绩单分析错误: {str(e)}")
@@ -1042,6 +1042,41 @@ def main():
             st.session_state.show_transcript_analysis = True
             st.session_state.transcript_analysis_done = False
             st.rerun()  # 触发重新运行以开始分析
+            
+        # 显示成绩单分析结果（在按钮下方）
+        if st.session_state.show_transcript_analysis:
+            if not st.session_state.transcript_analysis_done:
+                try:
+                    # 确保 prompt_templates 存在
+                    if 'prompt_templates' not in st.session_state:
+                        st.session_state.prompt_templates = PromptTemplates()
+                    
+                    transcript_analyzer = TranscriptAnalyzer(
+                        api_key=st.secrets["OPENROUTER_API_KEY"],
+                        prompt_templates=st.session_state.prompt_templates
+                    )
+                    
+                    with st.spinner("正在分析成绩单..."):
+                        # 处理成绩单分析
+                        result = transcript_analyzer.analyze_transcripts(
+                            st.session_state.transcript_files
+                        )
+                        
+                        if result["status"] == "success":
+                            # 保存成绩单分析结果到 session_state
+                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
+                            st.session_state.transcript_analysis_done = True
+                            st.success("✅ 成绩单分析完成！")
+                        else:
+                            st.error(f"成绩单分析出错: {result['message']}")
+                
+                except Exception as e:
+                    st.error(f"处理过程中出错: {str(e)}")
+            else:
+                with st.expander("查看成绩单分析结果", expanded=False):
+                    # 如果已经完成，直接显示结果
+                    st.markdown(st.session_state.transcript_analysis_result)
+                    st.success("✅ 成绩单分析完成！")
     else:
         # 文件被移除，清除相关状态
         if 'last_transcript_files' in st.session_state:
@@ -1187,42 +1222,42 @@ def main():
     results_container = st.container()
     
     # 显示成绩单分析
-    if st.session_state.show_transcript_analysis:
-        with results_container:
-            st.markdown("---")
-            st.subheader("📊 成绩单分析")
-            
-            if not st.session_state.transcript_analysis_done:
-                try:
-                    # 确保 prompt_templates 存在
-                    if 'prompt_templates' not in st.session_state:
-                        st.session_state.prompt_templates = PromptTemplates()
-                    
-                    transcript_analyzer = TranscriptAnalyzer(
-                        api_key=st.secrets["OPENROUTER_API_KEY"],
-                        prompt_templates=st.session_state.prompt_templates
-                    )
-                    
-                    with st.spinner("正在分析成绩单..."):
-                        # 处理成绩单分析
-                        result = transcript_analyzer.analyze_transcripts(
-                            st.session_state.transcript_files
-                        )
-                        
-                        if result["status"] == "success":
-                            # 保存成绩单分析结果到 session_state
-                            st.session_state.transcript_analysis_result = result["transcript_analysis"]
-                            st.session_state.transcript_analysis_done = True
-                            st.success("✅ 成绩单分析完成！")
-                        else:
-                            st.error(f"成绩单分析出错: {result['message']}")
-                
-                except Exception as e:
-                    st.error(f"处理过程中出错: {str(e)}")
-            else:
-                # 如果已经完成，直接显示结果
-                st.markdown(st.session_state.transcript_analysis_result)
-                st.success("✅ 成绩单分析完成！")
+    # if st.session_state.show_transcript_analysis:
+    #     with results_container:
+    #         st.markdown("---")
+    #         st.subheader("📊 成绩单分析")
+    #         
+    #         if not st.session_state.transcript_analysis_done:
+    #             try:
+    #                 # 确保 prompt_templates 存在
+    #                 if 'prompt_templates' not in st.session_state:
+    #                     st.session_state.prompt_templates = PromptTemplates()
+    #                 
+    #                 transcript_analyzer = TranscriptAnalyzer(
+    #                     api_key=st.secrets["OPENROUTER_API_KEY"],
+    #                     prompt_templates=st.session_state.prompt_templates
+    #                 )
+    #                 
+    #                 with st.spinner("正在分析成绩单..."):
+    #                     # 处理成绩单分析
+    #                     result = transcript_analyzer.analyze_transcripts(
+    #                         st.session_state.transcript_files
+    #                     )
+    #                     
+    #                     if result["status"] == "success":
+    #                         # 保存成绩单分析结果到 session_state
+    #                         st.session_state.transcript_analysis_result = result["transcript_analysis"]
+    #                         st.session_state.transcript_analysis_done = True
+    #                         st.success("✅ 成绩单分析完成！")
+    #                     else:
+    #                         st.error(f"成绩单分析出错: {result['message']}")
+    #             
+    #             except Exception as e:
+    #                 st.error(f"处理过程中出错: {str(e)}")
+    #         else:
+    #             # 如果已经完成，直接显示结果
+    #             st.markdown(st.session_state.transcript_analysis_result)
+    #             st.success("✅ 成绩单分析完成！")
     
     # 修改内容规划显示，只保留单文档逻辑
     if st.session_state.show_creator_analysis:
