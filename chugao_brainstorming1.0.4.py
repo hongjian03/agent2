@@ -1294,6 +1294,12 @@ def main():
             st.markdown("---")
             st.subheader("📝 内容规划")
             
+            # 获取北京时间并显示在标题下方
+            from datetime import datetime
+            from zoneinfo import ZoneInfo
+            beijing_time = datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d %H:%M:%S")
+            st.markdown(f"*生成时间：{beijing_time} (北京时间)*")
+            
             if not st.session_state.creator_analysis_done:
                 try:
                     agent = BrainstormingAgent(
