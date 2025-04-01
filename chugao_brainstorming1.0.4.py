@@ -1025,10 +1025,6 @@ def main():
                                    
     # 添加成绩单分析按钮
     if transcript_files:
-        # 显示上传的文件列表
-        st.write(f"已上传 {len(transcript_files)} 个文件:")
-        for i, file in enumerate(transcript_files):
-            st.write(f"{i+1}. {file.name}")
         
         analyze_transcript_button = st.button(
             "开始分析成绩单", 
