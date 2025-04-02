@@ -14,21 +14,93 @@ import tempfile
 import os
 import fitz  # PyMuPDF
 from typing import List, Tuple, Dict, Any
+import sys
+import subprocess
+import importlib.util
+import requests
+
+def load_spacy_model(model_name):
+    """加载或安装指定的 spaCy 模型"""
+    try:
+        # 尝试导入模型
+        if model_name == "zh_core_web_md":
+            import zh_core_web_md
+            return zh_core_web_md.load()
+        elif model_name == "en_core_web_md":
+            import en_core_web_md
+            return en_core_web_md.load()
+    except ImportError:
+        # 如果导入失败，尝试从本地安装
+        try:
+            # 获取当前文件的目录
+            current_dir = os.path.dirname(os.path.abspath(__file__))
+            # WHL 文件的相对路径
+            whl_path = os.path.join(current_dir, "models", f"{model_name}-3.8.0-py3-none-any.whl")
+            
+            # 如果本地不存在，从Release下载
+            if not os.path.exists(whl_path):
+                whl_path = download_model_from_release(model_name)
+            
+            if whl_path and os.path.exists(whl_path):
+                print(f"正在从本地安装 spaCy 模型: {whl_path}")
+                # 使用 pip 从本地安装
+                subprocess.check_call([sys.executable, "-m", "pip", "install", whl_path])
+                
+                # 安装后重新导入
+                if model_name == "zh_core_web_md":
+                    import zh_core_web_md
+                    return zh_core_web_md.load()
+                elif model_name == "en_core_web_md":
+                    import en_core_web_md
+                    return en_core_web_md.load()
+            else:
+                print(f"找不到本地模型文件: {whl_path}")
+                return None
+        except Exception as e:
+            print(f"安装模型时出错: {str(e)}")
+            return None
+
+def download_model_from_release(model_name):
+    """从GitHub Release下载模型"""
+    release_url = f"https://github.com/hongjian03/agent2/releases/download/v1.0/{model_name}-3.8.0-py3-none-any.whl"
+    local_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "models", f"{model_name}-3.8.0-py3-none-any.whl")
+    
+    # 确保models目录存在
+    os.makedirs(os.path.dirname(local_path), exist_ok=True)
+    
+    # 下载文件
+    print(f"从Release下载模型: {release_url}")
+    response = requests.get(release_url)
+    if response.status_code == 200:
+        with open(local_path, 'wb') as f:
+            f.write(response.content)
+        print(f"模型下载成功: {local_path}")
+        return local_path
+    else:
+        print(f"下载失败，状态码: {response.status_code}")
+        return None
 
 class TranscriptPreprocessor:
     def __init__(self):
-        # 初始化 NLP 模型和分析器
+        # 加载spaCy中英文模型
+        self.nlp_en = None
+        self.nlp_zh = None
+        
         try:
-            self.nlp_en = spacy.load("en_core_web_md")
-            try:
-                self.nlp_zh = spacy.load("zh_core_web_md")
-            except:
-                st.warning("中文模型未加载，使用英文模型代替")
-                self.nlp_zh = None
+            # 尝试从本地加载英文模型
+            self.nlp_en = load_spacy_model("en_core_web_md")
+            if self.nlp_en is None:
+                st.warning("无法加载英文模型，将使用备用方法")
         except Exception as e:
-            st.error(f"加载NLP模型出错: {str(e)}")
-            self.nlp_en = None
-            self.nlp_zh = None
+            st.warning(f"加载英文模型出错: {str(e)}")
+        
+        try:
+            # 尝试从本地加载中文模型
+            self.nlp_zh = load_spacy_model("zh_core_web_md")
+            if self.nlp_zh is None:
+                st.warning("无法加载中文模型，将使用备用方法")
+        except Exception as e:
+            st.warning(f"加载中文模型出错: {str(e)}")
         
         # 初始化Presidio
         try:
