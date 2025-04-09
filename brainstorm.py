@@ -47,12 +47,12 @@ def get_langchain_llm(model_type="simplify", stream=False, st_container=None):
     if model_type == "simplify":
         # 素材分析使用的API密钥和模型
         api_key = st.secrets.get("OPENROUTER_API_KEY_SIMPLIFY", "")
-        model_name = "openai/gpt-3.5-turbo"  # 使用更稳定的模型
+        model_name = "qwen/qwq-32b:free"  # 使用更稳定的模型
         temperature = 0.1  # 降低温度以获得更稳定的输出
     else:  # analysis
         # 脑暴报告使用的API密钥和模型
         api_key = st.secrets.get("OPENROUTER_API_KEY_ANALYSIS", "")
-        model_name = "openai/gpt-3.5-turbo"  # 使用更稳定的模型
+        model_name = "qwen/qwq-32b:free"  # 使用更稳定的模型
         temperature = 0.3  # 降低温度以获得更稳定的输出
         
     # 检查API密钥是否为空
