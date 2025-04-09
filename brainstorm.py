@@ -24,6 +24,13 @@ try:
 except ImportError:
     IMAGE_SUPPORT = False
 
+# 导入 markitdown 包
+try:
+    from markitdown import MarkItDown
+    MARKITDOWN_SUPPORT = True
+except ImportError:
+    MARKITDOWN_SUPPORT = False
+
 # 导入 LangChain 相关库
 from langchain.llms import OpenAI
 from langchain.prompts import PromptTemplate
@@ -89,114 +96,27 @@ def process_file(file_path, file_type):
         # 检查文件是否存在并有内容
         if not os.path.exists(file_path) or os.path.getsize(file_path) == 0:
             return f"警告: 文件 {os.path.basename(file_path)} 为空或不存在"
-            
-        if file_type == "docx" and DOCX_SUPPORT:
+        
+        # 首先尝试使用 markitdown 包转换文件（如果可用）
+        if MARKITDOWN_SUPPORT:
             try:
-                # 使用python-docx处理
-                doc = docx.Document(file_path)
-                content_parts = []
+                # 创建 MarkItDown 实例
+                markdown_converter = MarkItDown()
                 
-                # 提取段落文本
-                for para in doc.paragraphs:
-                    if para.text.strip():
-                        # 增强格式处理，保留更多格式信息
-                        para_text = ""
-                        for run in para.runs:
-                            text = run.text.strip()
-                            if not text:
-                                continue
-                                
-                            # 处理加粗
-                            if run.bold:
-                                text = f"**{text}**"
-                            # 处理斜体
-                            if run.italic:
-                                text = f"*{text}*"
-                            # 处理下划线
-                            if run.underline:
-                                text = f"__{text}__"
-                            # 处理字体大小
-                            if run.font.size:
-                                size = run.font.size.pt if run.font.size.pt else 11
-                                if size > 11:
-                                    text = f"# {text}" if size > 14 else f"## {text}"
-                            
-                            para_text += text + " "
-                        
-                        # 清理多余空格并添加段落
-                        if para_text.strip():
-                            content_parts.append(para_text.strip())
+                # 使用 MarkItDown 转换文件
+                result = markdown_converter.convert_file(file_path)
                 
-                # 提取表格内容
-                for table_idx, table in enumerate(doc.tables):
-                    if len(table.rows) == 0:
-                        continue
-                    
-                    # 添加表格标记
-                    content_parts.append(f"\n## 表格 {table_idx+1}")
-                    
-                    # 判断表格类型和结构
-                    is_questionnaire = False
-                    if len(table.rows) > 1 and len(table.rows[0].cells) > 0:
-                        # 检查第一行是否可能是表头
-                        header_row = [cell.text.strip() for cell in table.rows[0].cells]
-                        is_questionnaire = any("问题" in cell or "题" in cell for cell in header_row) or len(header_row) >= 2
-                    
-                    if is_questionnaire:
-                        # 特殊处理问卷表格，按行分组
-                        headers = []
-                        for cell in table.rows[0].cells:
-                            headers.append(cell.text.strip())
-                        
-                        # 处理内容行
-                        for row_idx in range(1, len(table.rows)):
-                            row_content = []
-                            for col_idx, cell in enumerate(table.rows[row_idx].cells):
-                                cell_text = cell.text.strip()
-                                # 如果有表头且内容不为空，关联显示
-                                if cell_text and col_idx < len(headers) and headers[col_idx]:
-                                    row_content.append(f"{headers[col_idx]}: {cell_text}")
-                                elif cell_text:
-                                    row_content.append(cell_text)
-                            
-                            # 只添加非空内容
-                            if row_content:
-                                content_parts.append(" | ".join(row_content))
-                    else:
-                        # 常规表格处理
-                        for row in table.rows:
-                            row_texts = []
-                            for cell in row.cells:
-                                cell_text = cell.text.strip()
-                                if cell_text:
-                                    # 替换可能导致格式问题的字符
-                                    cell_text = cell_text.replace('\n', ' ').replace('|', '/')
-                                    row_texts.append(cell_text)
-                            
-                            # 只添加非空行
-                            if row_texts:
-                                content_parts.append(" | ".join(row_texts))
-                
-                # 合并所有内容，添加适当的换行
-                content = "\n\n".join(content_parts)
-                
-                # 记录日志
-                st.write(f"从DOCX文件 {os.path.basename(file_path)} 读取了 {len(content)} 字符")
-                    
-                # 后处理，清理可能的重复内容和格式标记
-                content = content.replace('{.mark}', '').replace('{.underline}', '')
-                
-                # 确保内容不为空
-                if not content.strip():
-                    return f"警告: 文件 {os.path.basename(file_path)} 内容为空"
-                
-                return content
+                # 从结果中获取 markdown 内容
+                if result and hasattr(result, 'markdown') and result.markdown:
+                    st.write(f"使用 MarkItDown 转换文件 {os.path.basename(file_path)} 成功，获取了 {len(result.markdown)} 字符")
+                    return result.markdown
+                else:
+                    st.warning(f"MarkItDown 转换文件 {os.path.basename(file_path)} 未返回内容，将尝试其他方法")
             except Exception as e:
-                error_msg = f"读取DOCX文件时出错: {str(e)}"
-                st.error(error_msg)
-                return error_msg
-                
-        elif file_type == "pdf" and PDF_SUPPORT:
+                st.warning(f"MarkItDown 处理文件时出错: {str(e)}，将尝试其他方法")
+        
+        # 如果 markitdown 不可用或转换失败，则使用备用方法
+        if file_type == "pdf" and PDF_SUPPORT:
             try:
                 pdf_reader = PdfReader(file_path)
                 text = ""
