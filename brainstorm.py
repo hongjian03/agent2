@@ -98,7 +98,7 @@ def process_file(file_path, file_type):
                 markdown_converter = MarkItDown()
                 
                 # 使用 MarkItDown 转换文件
-                result = markdown_converter.convert_file(file_path)
+                result = markdown_converter.convert(file_path)
                 
                 # 从结果中获取 markdown 内容
                 if result and hasattr(result, 'markdown') and result.markdown:
