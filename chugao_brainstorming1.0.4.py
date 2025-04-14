@@ -499,7 +499,7 @@ class TranscriptAnalyzer:
             # 简化素材表 Chain
             simplifier_prompt = ChatPromptTemplate.from_messages([
                 ("system", f"{self.prompt_templates.get_template('material_simplifier_role')}\n\n"
-                        f"任务:\n{self.prompt_templates.get_template('material_simplifier_tesk')}\n\n"
+                        f"任务:\n{self.prompt_templates.get_template('material_simplifier_task')}\n\n"
                         f"请按照以下格式输出:\n{self.prompt_templates.get_template('material_simplifier_output')}"),
                 ("human", "素材表document_content：\n{document_content}")
             ])
